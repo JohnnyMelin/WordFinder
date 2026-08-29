@@ -8,14 +8,22 @@
 // logic lives here; this module is verified by loading the page in a
 // browser, not by unit tests (see spec.md's Testing Decisions).
 //
-// Two screens: a start screen (grid size + word count, delegated to
-// start-screen.js) and this puzzle screen. Starting a puzzle swaps from
-// one to the other; "New Puzzle" swaps back so the player can
-// reconfigure and start again without a page reload.
+// Two screens: a start screen (grid size + theme + word count,
+// delegated to start-screen.js) and this puzzle screen. Starting a
+// puzzle swaps from one to the other; "New Puzzle" swaps back so the
+// player can reconfigure and start again without a page reload.
+//
+// Word source: the six curated theme lists in data/themes.js (ticket
+// 05). This is the only module that knows the pool's shape (a
+// theme-name -> word-list map); start-screen.js stays generic by taking
+// the theme names and a getPoolSize(gridSize, theme) callback as
+// options instead of importing theme data itself.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
-import { PLACEHOLDER_WORDS, PLACEHOLDER_THEME } from './data/placeholder-words.js';
+import { THEMES } from './data/themes.js';
 import { initStartScreen } from './start-screen.js';
+
+const THEME_NAMES = Object.keys(THEMES);
 
 /**
  * Renders the letter grid and returns a 2D array of the cell elements,
@@ -253,13 +261,16 @@ function shuffled(list) {
   return copy;
 }
 
-/** Size of the active word pool that actually qualifies for `gridSize`
+/** Size of `theme`'s word pool that actually qualifies for `gridSize`
  * (i.e. fits within it). This is the generic "pool size" input to
- * getWordCountMax — reading PLACEHOLDER_WORDS.length here rather than
- * hardcoding a number means ticket 05/06 can swap in a different (and
- * differently-sized) pool per theme without this logic changing. */
-function poolSizeFor(gridSize) {
-  return PLACEHOLDER_WORDS.filter((word) => word.length <= gridSize).length;
+ * getWordCountMax — looking the pool up by theme name here rather than
+ * hardcoding one list means switching themes on the start screen
+ * recomputes the cap against the newly selected theme's own word
+ * count, and a future differently-sized theme (ticket 06's Random/Any)
+ * needs no change to this logic. */
+function poolSizeFor(gridSize, theme) {
+  const pool = THEMES[theme] ?? [];
+  return pool.filter((word) => word.length <= gridSize).length;
 }
 
 /** Shows exactly one of the top-level `.screen` sections (by element id)
@@ -276,12 +287,13 @@ function showScreen(id) {
 // setupSelection's doc comment on why this is necessary).
 let selectionAbortController = null;
 
-function startPuzzle({ gridSize, wordCount }) {
-  const words = pickWords(PLACEHOLDER_WORDS, gridSize, wordCount);
+function startPuzzle({ gridSize, theme, wordCount }) {
+  const pool = THEMES[theme] ?? [];
+  const words = pickWords(pool, gridSize, wordCount);
   const { grid, placements } = generatePuzzle(words, gridSize);
 
   const themeLabel = document.getElementById('theme-label');
-  if (themeLabel) themeLabel.textContent = PLACEHOLDER_THEME;
+  if (themeLabel) themeLabel.textContent = theme;
 
   const gridContainer = document.getElementById('grid');
   const cellElements = renderGrid(grid, gridContainer);
@@ -305,12 +317,11 @@ function startPuzzle({ gridSize, wordCount }) {
 }
 
 function init() {
-  const startThemeLabel = document.getElementById('start-theme-label');
-  if (startThemeLabel) startThemeLabel.textContent = PLACEHOLDER_THEME;
-
   initStartScreen({
     form: document.getElementById('start-form'),
     gridSizeContainer: document.getElementById('grid-size-choices'),
+    themeContainer: document.getElementById('theme-choices'),
+    themes: THEME_NAMES,
     wordCountInput: document.getElementById('word-count'),
     getPoolSize: poolSizeFor,
     onStart: startPuzzle,

@@ -71,8 +71,7 @@ function createEmptyGrid(gridSize) {
   return Array.from({ length: gridSize }, () => Array(gridSize).fill(null));
 }
 
-const MAX_GRID_ATTEMPTS = 50;
-const MAX_WORD_ATTEMPTS = 200;
+const MAX_GRID_ATTEMPTS = 200;
 
 function placeWords(words, gridSize) {
   const tooLong = words.find((word) => word.length > gridSize);
@@ -92,7 +91,8 @@ function placeWords(words, gridSize) {
   // to go, even though a different arrangement would have fit everything.
   // Rather than backtrack mid-placement, retry the whole grid from
   // scratch with a fresh random layout — cheap, and reliable in practice
-  // for grids with reasonable slack. Allowing overlaps (see canPlaceAt)
+  // for grids with reasonable slack. Allowing overlaps, and preferring
+  // the most-overlapping legal spot for each word (see findSpotForWord),
   // makes this even more reliable than in the horizontal-only ticket 01
   // version, since a word can now share cells with words already placed
   // instead of needing entirely empty ones.
@@ -121,80 +121,72 @@ function placeWords(words, gridSize) {
 }
 
 /**
- * Finds a direction + starting position to place `word` at, trying random
- * direction/position combinations first (for a varied-looking layout),
- * then falling back to an exhaustive deterministic scan over every
- * direction and position so the word still gets placed whenever any legal
- * spot exists anywhere in the grid, even if the random attempts above got
- * unlucky (e.g. a crowded grid with only one or two overlap-friendly
- * spots left).
+ * Finds a direction + starting position to place `word` at, preferring
+ * whichever legal spot overlaps the most already-placed letters.
+ *
+ * Scans every direction/position combination (via `overlapCountAt`) and
+ * keeps only the spots tied for the highest overlap count seen, picking
+ * uniformly at random among those ties — so an empty grid (where every
+ * legal spot has 0 overlap) still gets a varied, randomly chosen
+ * placement, exactly as before, but a partially-filled grid now packs
+ * words onto existing letters wherever possible instead of only
+ * stumbling onto overlaps by chance.
+ *
+ * This matters at the high end of the curated themes' word counts
+ * (ticket 05): packing e.g. 30 words averaging ~7 letters into a 10x10
+ * grid (100 cells) needs roughly 40-50% of those letters to land on
+ * cells shared with other words — random-then-fallback placement (this
+ * function's previous strategy) essentially never finds that much
+ * overlap by chance, so `placeWords` exhausted all `MAX_GRID_ATTEMPTS`
+ * restarts and threw. Always taking the best available overlap makes
+ * that packing density achievable.
  */
 function findSpotForWord(grid, word, gridSize) {
-  for (let attempt = 0; attempt < MAX_WORD_ATTEMPTS; attempt++) {
-    const direction = DIRECTIONS[randomInt(DIRECTIONS.length)];
-    const { row, col } = randomStartFor(word, direction, gridSize);
-    if (canPlaceAt(grid, word, row, col, direction, gridSize)) {
-      return { row, col, direction };
-    }
-  }
+  let bestOverlap = -1;
+  let candidates = [];
 
   for (const direction of DIRECTIONS) {
     for (let row = 0; row < gridSize; row++) {
       for (let col = 0; col < gridSize; col++) {
-        if (canPlaceAt(grid, word, row, col, direction, gridSize)) {
-          return { row, col, direction };
+        const overlap = overlapCountAt(grid, word, row, col, direction, gridSize);
+        if (overlap === null) continue;
+
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          candidates = [{ row, col, direction }];
+        } else if (overlap === bestOverlap) {
+          candidates.push({ row, col, direction });
         }
       }
     }
   }
 
-  return null;
-}
-
-/**
- * Picks a uniformly random in-bounds starting cell for `word` walking in
- * `direction` across a `gridSize` x `gridSize` grid. Since every word is
- * already guaranteed to be no longer than `gridSize` (checked in
- * `placeWords`), a valid start always exists for every direction.
- */
-function randomStartFor(word, direction, gridSize) {
-  const rowRange = startRange(direction.dRow, word.length, gridSize);
-  const colRange = startRange(direction.dCol, word.length, gridSize);
-  return {
-    row: rowRange.min + randomInt(rowRange.max - rowRange.min + 1),
-    col: colRange.min + randomInt(colRange.max - colRange.min + 1),
-  };
-}
-
-/**
- * The inclusive range of valid starting coordinates along one axis, given
- * that axis's step delta (-1, 0, or 1) for `word.length` steps inside a
- * `gridSize`-wide grid. E.g. stepping -1 (walking toward index 0) means
- * the start must be at least `word.length - 1` so the word doesn't walk
- * off the low edge.
- */
-function startRange(step, wordLength, gridSize) {
-  if (step === 0) return { min: 0, max: gridSize - 1 };
-  if (step > 0) return { min: 0, max: gridSize - wordLength };
-  return { min: wordLength - 1, max: gridSize - 1 };
+  if (candidates.length === 0) return null;
+  return candidates[randomInt(candidates.length)];
 }
 
 /**
  * Whether `word` can be written starting at (row, col) walking in
  * `direction` without running off the grid or landing on a cell that's
- * already a *different* letter. A cell already holding the *same* letter
- * is fine — that's an intentional overlap between two crossing words.
+ * already a *different* letter, and if so, how many of its cells land on
+ * a cell some other word already placed (an intentional overlap). Returns
+ * `null` when the placement isn't legal at all (out of bounds, or a
+ * conflicting letter at a shared cell).
  */
-function canPlaceAt(grid, word, row, col, direction, gridSize) {
+function overlapCountAt(grid, word, row, col, direction, gridSize) {
+  let overlap = 0;
   for (let i = 0; i < word.length; i++) {
     const r = row + direction.dRow * i;
     const c = col + direction.dCol * i;
-    if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return false;
+    if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return null;
 
     const existing = grid[r][c];
-    if (existing !== null && existing !== word[i]) return false;
+    if (existing !== null) {
+      if (existing !== word[i]) return null;
+      overlap++;
+    }
   }
-  return true;
+  return overlap;
 }
 
 function placeWordAt(grid, word, row, col, direction) {
