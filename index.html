@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word Finder</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <main class="puzzle-screen">
+      <h1>Word Finder</h1>
+      <p class="theme">Theme: <span id="theme-label"></span></p>
+
+      <div class="puzzle-layout">
+        <div id="grid" class="grid" role="grid" aria-label="Word search grid"></div>
+
+        <aside class="word-panel">
+          <h2>Find these words</h2>
+          <ul id="word-list" class="word-list"></ul>
+        </aside>
+      </div>
+    </main>
+
+    <script type="module" src="js/ui.js"></script>
+  </body>
+</html>

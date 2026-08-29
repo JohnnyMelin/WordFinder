@@ -1,0 +1,10 @@
+{
+  "name": "word-finder",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Static, buildless word-search puzzle game. Plain HTML/CSS/JS, no framework, no build step.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
