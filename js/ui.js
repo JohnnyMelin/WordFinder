@@ -16,12 +16,13 @@
 // Word source: the six curated theme lists in data/themes.js (ticket
 // 05), plus a seventh "Random/Any" theme (ticket 06) whose words come
 // from data/random-words.json. Fetching and resolving that pool data
-// lives in word-pools.js (loadRandomWords/poolFor/poolSizeFor), imported
-// below; this module just calls into it to pick words for a puzzle.
+// lives in word-pools.js (loadRandomWords/poolFor/wordCountMaxFor),
+// imported below; this module just calls into it to pick words for a
+// puzzle.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
 import { initStartScreen } from './start-screen.js';
-import { THEME_NAMES, loadRandomWords, poolFor, poolSizeFor } from './word-pools.js';
+import { THEME_NAMES, loadRandomWords, poolFor, wordCountMaxFor } from './word-pools.js';
 
 /**
  * Renders the letter grid and returns a 2D array of the cell elements,
@@ -307,7 +308,8 @@ async function init() {
   // is fully ready before the player can interact with the theme
   // selector — no async creeps past this point into start-screen.js or
   // startPuzzle's synchronous pool lookups. loadRandomWords (word-pools.js)
-  // populates its own internal pool, which poolFor/poolSizeFor then read.
+  // populates its own internal pool, which poolFor/wordCountMaxFor then
+  // read.
   await loadRandomWords();
 
   initStartScreen({
@@ -316,7 +318,7 @@ async function init() {
     themeContainer: document.getElementById('theme-choices'),
     themes: THEME_NAMES,
     wordCountInput: document.getElementById('word-count'),
-    getPoolSize: poolSizeFor,
+    getWordCountMax: wordCountMaxFor,
     onStart: startPuzzle,
   });
 

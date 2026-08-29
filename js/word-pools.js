@@ -7,14 +7,17 @@
 // the pool's shape (a theme-name -> word-list map, curated themes
 // imported directly, Random/Any fetched); ui.js imports it for its
 // puzzle-start word selection, and start-screen.js stays generic (it
-// takes theme names and a getPoolSize(gridSize, theme) callback as
-// options instead of importing or fetching theme data itself — see that
-// module's header comment).
+// takes theme names and a getWordCountMax(gridSize, theme) callback —
+// wordCountMaxFor below — as options instead of importing or fetching
+// theme data itself, or even knowing which theme is the uncorrelated one
+// that needs a different ceiling table; see that module's header
+// comment).
 //
 // Rendering, Pointer Events selection, and screen navigation are *not*
 // this module's concern; those stay in ui.js.
 
 import { THEMES } from './data/themes.js';
+import { getWordCountMax, RANDOM_POOL_WORD_COUNT_MAX } from './game-logic.js';
 
 export const RANDOM_THEME_NAME = 'Random/Any';
 const RANDOM_WORDS_URL = 'data/random-words.json';
@@ -66,4 +69,19 @@ export function poolFor(theme) {
  * poolFor already resolves it to the fetched word list. */
 export function poolSizeFor(gridSize, theme) {
   return poolFor(theme).filter((word) => word.length <= gridSize).length;
+}
+
+/**
+ * The word-count max the start screen should offer for `gridSize` +
+ * `theme`, combining poolSizeFor with the right ceiling table:
+ * RANDOM_POOL_WORD_COUNT_MAX for Random/Any (its fully-random words lack
+ * the letter correlation curated themes have, so it needs a lower ceiling
+ * at some grid sizes — see that constant's comment in game-logic.js),
+ * GRID_SIZE_WORD_COUNT_MAX for every curated theme. This is the only
+ * place that needs to know which theme is the uncorrelated one —
+ * start-screen.js stays theme-agnostic and just calls this.
+ */
+export function wordCountMaxFor(gridSize, theme) {
+  const maxMap = theme === RANDOM_THEME_NAME ? RANDOM_POOL_WORD_COUNT_MAX : undefined;
+  return getWordCountMax(gridSize, poolSizeFor(gridSize, theme), maxMap);
 }

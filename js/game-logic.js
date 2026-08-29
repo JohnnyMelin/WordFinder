@@ -417,6 +417,30 @@ export const GRID_SIZE_WORD_COUNT_MAX = {
   20: 45,
 };
 
+// A second, lower ceiling for word pools whose words are NOT drawn from a
+// small, letter-correlated theme (i.e. Random/Any's pool, ticket 06) —
+// see getWordCountMax's `maxMap` parameter. GRID_SIZE_WORD_COUNT_MAX was
+// tuned against curated themes, whose ~100-word vocabularies share far
+// more letters/roots with each other than a fully random sample of the
+// same size does, giving the overlap-seeking placement algorithm easy
+// candidates. A truly random sample often doesn't have that correlation,
+// and empirically fails 20x20's shared max of 45 outright (confirmed:
+// 4/40 runs failed, with successful runs averaging ~15.5s and some over
+// 78s — a real crash/freeze risk, not just occasional slowness). Testing
+// lower word counts against generatePuzzle with real samples drawn from
+// data/random-words.json found:
+//   - 6x6/6 and 10x10/10 (the shared maxes) were already fully reliable
+//     for a random pool too (0 failures across 60 runs each, sub-5ms) —
+//     no separate entry needed for those sizes.
+//   - 20x20/45 (the shared max): 4/40 failed, successful runs averaging
+//     ~15.5s. 20x20/40: reliable (0/40) but had an 828ms worst-case
+//     spike. 20x20/35: reliable and fast (0/150 failures across a larger
+//     confirmation run, 51ms worst case, ~9ms average) — the value used
+//     here.
+export const RANDOM_POOL_WORD_COUNT_MAX = {
+  20: 35,
+};
+
 /**
  * The maximum word count the start screen should allow for `gridSize`,
  * further capped down to `poolSize` when the active word pool (theme)
@@ -431,10 +455,17 @@ export const GRID_SIZE_WORD_COUNT_MAX = {
  *   6, 10, or 20).
  * @param {number} poolSize - number of qualifying words in the active
  *   word pool.
- * @returns {number} the smaller of the grid size's max and `poolSize`.
+ * @param {Record<number, number>} [maxMap] - which per-grid-size ceiling
+ *   table to use; defaults to GRID_SIZE_WORD_COUNT_MAX (curated themes).
+ *   Callers sourcing words from an uncorrelated pool (Random/Any) should
+ *   pass RANDOM_POOL_WORD_COUNT_MAX instead — it falls back to
+ *   GRID_SIZE_WORD_COUNT_MAX's value for any grid size it doesn't
+ *   override, since only 20x20 currently needs a lower ceiling.
+ * @returns {number} the smaller of the resolved grid-size max and
+ *   `poolSize`.
  */
-export function getWordCountMax(gridSize, poolSize) {
-  const sizeMax = GRID_SIZE_WORD_COUNT_MAX[gridSize];
+export function getWordCountMax(gridSize, poolSize, maxMap = GRID_SIZE_WORD_COUNT_MAX) {
+  const sizeMax = maxMap[gridSize] ?? GRID_SIZE_WORD_COUNT_MAX[gridSize];
   if (sizeMax === undefined) {
     throw new RangeError(`getWordCountMax: unsupported grid size ${gridSize}`);
   }

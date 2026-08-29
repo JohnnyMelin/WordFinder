@@ -3,17 +3,16 @@
 // Start-screen controller: lets the player pick a grid size, a theme, and
 // a word count before playing, then hands that configuration off to a
 // caller-supplied callback (ui.js generates and renders the puzzle from
-// it). Pure DOM wiring only — the actual word-count-max math is the pure
-// `getWordCountMax` helper in game-logic.js, which is unit tested
-// without a DOM; this module just keeps the word-count input's `max`
-// (and current value, if it now overshoots) in sync with whatever that
-// helper returns whenever the grid size or theme changes. It doesn't
-// know anything about theme *data* itself (no import of
-// data/themes.js) — the caller supplies the list of theme names to
-// render and a `getPoolSize(gridSize, theme)` callback to size against,
-// the same way it already supplies `getPoolSize` for grid size alone.
-
-import { getWordCountMax } from './game-logic.js';
+// it). Pure DOM wiring only — the actual word-count-max math (including
+// which per-theme ceiling table applies) lives entirely in the caller-
+// supplied `getWordCountMax(gridSize, theme)` callback; this module just
+// keeps the word-count input's `max` (and current value, if it now
+// overshoots) in sync with whatever that callback returns whenever the
+// grid size or theme changes. It doesn't know anything about theme
+// *data* itself (no import of data/themes.js, no import of game-logic.js)
+// — the caller supplies the list of theme names to render and the
+// `getWordCountMax` callback to size against, so this stays generic
+// across future pools/themes/ceilings without changes here.
 
 // Grid size choices offered on the start screen. Kept as UI-facing data
 // (value + label) separate from GRID_SIZE_WORD_COUNT_MAX in
@@ -84,11 +83,11 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
  *   order; the first is selected by default.
  * @param {HTMLInputElement} options.wordCountInput - the numeric word-
  *   count input; its `min`/`max`/`value` are managed here.
- * @param {(gridSize: number, theme: string) => number} options.getPoolSize
- *   - returns the active word pool's qualifying word count for a given
- *   grid size + theme pair, called fresh on every grid-size or theme
- *   change so this stays generic across future pools/themes of
- *   differing sizes.
+ * @param {(gridSize: number, theme: string) => number} options.getWordCountMax
+ *   - returns the word-count input's max for a given grid size + theme
+ *   pair (pool size already folded in), called fresh on every grid-size
+ *   or theme change so this stays generic across future pools/themes/
+ *   ceilings without changes here.
  * @param {(config: { gridSize: number, theme: string, wordCount: number }) => void} options.onStart
  *   called when the player starts a puzzle.
  */
@@ -98,7 +97,7 @@ export function initStartScreen({
   themeContainer,
   themes,
   wordCountInput,
-  getPoolSize,
+  getWordCountMax,
   onStart,
 }) {
   renderRadioGroup(gridSizeContainer, {
@@ -140,7 +139,7 @@ export function initStartScreen({
    * 10x10 to 6x6, after switching themes, or after the pool shrank).
    */
   function syncWordCountMax() {
-    const max = getWordCountMax(selectedGridSize(), getPoolSize(selectedGridSize(), selectedTheme()));
+    const max = getWordCountMax(selectedGridSize(), selectedTheme());
     wordCountInput.max = String(max);
     if (Number(wordCountInput.value) > max) {
       wordCountInput.value = String(max);
