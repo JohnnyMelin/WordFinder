@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { generatePuzzle, checkSelection, getWordCountMax } from './game-logic.js';
+import { generatePuzzle, checkSelection, getWordCountMax, GRID_SIZE_WORD_COUNT_MAX } from './game-logic.js';
 import { PLACEHOLDER_WORDS } from './data/placeholder-words.js';
+import { THEMES } from './data/themes.js';
 
 const SAMPLE_WORDS = ['CAT', 'DOG', 'LION', 'TIGER', 'ZEBRA'];
 
@@ -244,14 +245,18 @@ test('checkSelection works end-to-end against a generated puzzle, in either dire
 
 test('getWordCountMax uses the grid size\'s own max when the pool is large enough', () => {
   assert.equal(getWordCountMax(6, 16), 6);
-  assert.equal(getWordCountMax(10, 16), 16);
+  assert.equal(getWordCountMax(10, 8), 8);
   assert.equal(getWordCountMax(20, 16), 16);
 });
 
+// Ticket 07: these grid-size maxes (6/10/45) were re-tuned down from the
+// original spec numbers (6/30/50) — see GRID_SIZE_WORD_COUNT_MAX's doc
+// comment in game-logic.js for why, and the "generatePuzzle succeeds
+// reliably..." stress tests below for the empirical evidence.
 test('getWordCountMax caps down to the grid size\'s max even when the pool is bigger', () => {
   assert.equal(getWordCountMax(6, 500), 6);
-  assert.equal(getWordCountMax(10, 500), 30);
-  assert.equal(getWordCountMax(20, 500), 50);
+  assert.equal(getWordCountMax(10, 500), 10);
+  assert.equal(getWordCountMax(20, 500), 45);
 });
 
 test('getWordCountMax never hardcodes a pool size: it tracks whatever poolSize is passed in', () => {
@@ -268,3 +273,95 @@ test('getWordCountMax throws for an invalid pool size', () => {
   assert.throws(() => getWordCountMax(10, -1), TypeError);
   assert.throws(() => getWordCountMax(10, 1.5), TypeError);
 });
+
+// --- Ticket 07: reliability stress tests ---------------------------------
+//
+// The whole point of ticket 07 is that `generatePuzzle` must not just
+// *usually* succeed at the word counts the start screen can actually
+// offer (GRID_SIZE_WORD_COUNT_MAX, per grid size) — it must reliably
+// succeed, every time, for every theme. A handful of runs isn't a strong
+// enough signal for that (a placement algorithm with even a small
+// failure rate can look perfect across ten runs and still fail for
+// real players); these tests run each grid-size-at-its-own-max scenario
+// many times and assert zero failures across the whole batch.
+//
+// `pickWords` below deliberately mirrors ui.js's `pickWords` (shuffle
+// the theme pool, drop words longer than the grid, take the first N) —
+// it's re-implemented here rather than imported because ui.js touches
+// `document` at module load time (see spec.md's testing decision: the
+// UI layer isn't unit-tested, only played manually), so this keeps the
+// stress test exercising game-logic.js's public contract with exactly
+// the kind of word selection the real app will actually feed it.
+function pickWords(pool, gridSize, wordCount) {
+  const eligible = pool.filter((word) => word.length <= gridSize);
+  const shuffled = [...eligible];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, wordCount);
+}
+
+// A representative sample of themes, not all six (per ticket 07's
+// scope) — chosen to stress the algorithm, not just confirm the easy
+// cases: Sports and Vehicles are data/themes.js's longest-word-skewed
+// lists (many 8-14 letter words, e.g. "PADDLEBOARDING", "STATIONWAGON"),
+// which is exactly the profile that made 30-into-10x10 fail 100% of the
+// time before this ticket's fix, so they're the themes most likely to
+// expose a regression. Animals is included as a more typical/shorter
+// mixed-length profile for contrast.
+const STRESS_THEMES = ['Sports', 'Vehicles', 'Animals'];
+
+// Iterations per (grid size, theme) case. Lower for 20x20 than for 6x6
+// and 10x10 — not because it's less important, but because each
+// generatePuzzle call is inherently pricier on a 400-cell grid with up
+// to 45 words, so fewer runs are needed to keep the whole suite's
+// runtime reasonable while this remains a meaningful reliability signal
+// (see this describe block's intro comment).
+const STRESS_ITERATIONS_BY_GRID_SIZE = {
+  6: 300,
+  10: 300,
+  20: 100,
+};
+
+for (const gridSize of Object.keys(GRID_SIZE_WORD_COUNT_MAX).map(Number)) {
+  const wordCount = GRID_SIZE_WORD_COUNT_MAX[gridSize];
+  const iterations = STRESS_ITERATIONS_BY_GRID_SIZE[gridSize];
+
+  for (const theme of STRESS_THEMES) {
+    test(`generatePuzzle succeeds reliably at ${gridSize}x${gridSize}'s word-count max (${wordCount}) with the ${theme} theme (${iterations} runs)`, () => {
+      const pool = THEMES[theme];
+      const poolSize = pool.filter((word) => word.length <= gridSize).length;
+      const actualWordCount = getWordCountMax(gridSize, poolSize);
+      assert.ok(
+        actualWordCount > 0,
+        `expected the ${theme} theme to have at least one word <= ${gridSize} letters`
+      );
+
+      let failures = 0;
+      let firstError = null;
+
+      for (let i = 0; i < iterations; i++) {
+        const words = pickWords(pool, gridSize, actualWordCount);
+        try {
+          const { placements } = generatePuzzle(words, gridSize);
+          assert.equal(
+            placements.length,
+            words.length,
+            'every requested word must actually be placed, not silently dropped'
+          );
+        } catch (error) {
+          failures++;
+          if (!firstError) firstError = error;
+        }
+      }
+
+      assert.equal(
+        failures,
+        0,
+        `expected 0 failures placing ${actualWordCount} ${theme} words into a ${gridSize}x${gridSize} grid across ${iterations} runs, got ${failures}` +
+          (firstError ? ` (first error: ${firstError.message})` : '')
+      );
+    });
+  }
+}
