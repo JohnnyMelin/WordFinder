@@ -7,11 +7,15 @@
 // path for both input types. No puzzle-generation or match-checking
 // logic lives here; this module is verified by loading the page in a
 // browser, not by unit tests (see spec.md's Testing Decisions).
+//
+// Two screens: a start screen (grid size + word count, delegated to
+// start-screen.js) and this puzzle screen. Starting a puzzle swaps from
+// one to the other; "New Puzzle" swaps back so the player can
+// reconfigure and start again without a page reload.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
 import { PLACEHOLDER_WORDS, PLACEHOLDER_THEME } from './data/placeholder-words.js';
-
-const GRID_SIZE = 10;
+import { initStartScreen } from './start-screen.js';
 
 /**
  * Renders the letter grid and returns a 2D array of the cell elements,
@@ -92,8 +96,14 @@ function cellsAlongLine(start, end) {
  * cells is checked against the puzzle's placements; a match highlights
  * the cells and marks the word found, and finding every word shows the
  * win banner.
+ *
+ * `signal` is an AbortSignal that removes all of these listeners when
+ * aborted. The grid container element is reused across puzzles (only
+ * its children are replaced by `renderGrid`), so without this a second
+ * call to `setupSelection` for a new puzzle would stack a second set of
+ * listeners on top of the first, double-handling every pointer event.
  */
-function setupSelection({ container, cellElements, placements, itemsByWord, winBanner }) {
+function setupSelection({ container, cellElements, placements, itemsByWord, winBanner, signal }) {
   const gridSize = cellElements.length;
   const foundWords = new Set();
 
@@ -216,14 +226,59 @@ function setupSelection({ container, cellElements, placements, itemsByWord, winB
     startCell = null;
   }
 
-  container.addEventListener('pointerdown', handlePointerDown);
-  container.addEventListener('pointermove', handlePointerMove);
-  container.addEventListener('pointerup', handlePointerUp);
-  container.addEventListener('pointercancel', handlePointerCancel);
+  container.addEventListener('pointerdown', handlePointerDown, { signal });
+  container.addEventListener('pointermove', handlePointerMove, { signal });
+  container.addEventListener('pointerup', handlePointerUp, { signal });
+  container.addEventListener('pointercancel', handlePointerCancel, { signal });
 }
 
-function init() {
-  const { grid, placements } = generatePuzzle(PLACEHOLDER_WORDS, GRID_SIZE);
+/**
+ * Shuffles `pool`, filters to words that fit within `gridSize` (no
+ * longer than the grid itself — a placement over grid size would throw
+ * in generatePuzzle), and returns the first `wordCount` of them. The
+ * shuffle means replaying with the same settings doesn't always surface
+ * the exact same words.
+ */
+function pickWords(pool, gridSize, wordCount) {
+  const eligible = pool.filter((word) => word.length <= gridSize);
+  return shuffled(eligible).slice(0, wordCount);
+}
+
+function shuffled(list) {
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+/** Size of the active word pool that actually qualifies for `gridSize`
+ * (i.e. fits within it). This is the generic "pool size" input to
+ * getWordCountMax — reading PLACEHOLDER_WORDS.length here rather than
+ * hardcoding a number means ticket 05/06 can swap in a different (and
+ * differently-sized) pool per theme without this logic changing. */
+function poolSizeFor(gridSize) {
+  return PLACEHOLDER_WORDS.filter((word) => word.length <= gridSize).length;
+}
+
+/** Shows exactly one of the top-level `.screen` sections (by element id)
+ * and hides the rest, so start <-> puzzle transitions never require a
+ * page reload. */
+function showScreen(id) {
+  for (const screen of document.querySelectorAll('.screen')) {
+    screen.hidden = screen.id !== id;
+  }
+}
+
+// Listeners set up by setupSelection for the puzzle currently on screen,
+// so startPuzzle can tear them down before wiring up a fresh puzzle (see
+// setupSelection's doc comment on why this is necessary).
+let selectionAbortController = null;
+
+function startPuzzle({ gridSize, wordCount }) {
+  const words = pickWords(PLACEHOLDER_WORDS, gridSize, wordCount);
+  const { grid, placements } = generatePuzzle(words, gridSize);
 
   const themeLabel = document.getElementById('theme-label');
   if (themeLabel) themeLabel.textContent = PLACEHOLDER_THEME;
@@ -232,8 +287,41 @@ function init() {
   const cellElements = renderGrid(grid, gridContainer);
   const itemsByWord = renderWordList(placements, document.getElementById('word-list'));
   const winBanner = document.getElementById('win-banner');
+  winBanner.hidden = true;
 
-  setupSelection({ container: gridContainer, cellElements, placements, itemsByWord, winBanner });
+  if (selectionAbortController) selectionAbortController.abort();
+  selectionAbortController = new AbortController();
+
+  setupSelection({
+    container: gridContainer,
+    cellElements,
+    placements,
+    itemsByWord,
+    winBanner,
+    signal: selectionAbortController.signal,
+  });
+
+  showScreen('puzzle-screen');
+}
+
+function init() {
+  const startThemeLabel = document.getElementById('start-theme-label');
+  if (startThemeLabel) startThemeLabel.textContent = PLACEHOLDER_THEME;
+
+  initStartScreen({
+    form: document.getElementById('start-form'),
+    gridSizeContainer: document.getElementById('grid-size-choices'),
+    wordCountInput: document.getElementById('word-count'),
+    getPoolSize: poolSizeFor,
+    onStart: startPuzzle,
+  });
+
+  const newPuzzleButton = document.getElementById('new-puzzle-button');
+  if (newPuzzleButton) {
+    newPuzzleButton.addEventListener('click', () => showScreen('start-screen'));
+  }
+
+  showScreen('start-screen');
 }
 
 document.addEventListener('DOMContentLoaded', init);

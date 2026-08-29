@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { generatePuzzle, checkSelection } from './game-logic.js';
+import { generatePuzzle, checkSelection, getWordCountMax } from './game-logic.js';
 import { PLACEHOLDER_WORDS } from './data/placeholder-words.js';
 
 const SAMPLE_WORDS = ['CAT', 'DOG', 'LION', 'TIGER', 'ZEBRA'];
@@ -240,4 +240,31 @@ test('checkSelection works end-to-end against a generated puzzle, in either dire
 
   const reverseMatch = checkSelection(placements, [...target.cells].reverse());
   assert.equal(reverseMatch, target.word);
+});
+
+test('getWordCountMax uses the grid size\'s own max when the pool is large enough', () => {
+  assert.equal(getWordCountMax(6, 16), 6);
+  assert.equal(getWordCountMax(10, 16), 16);
+  assert.equal(getWordCountMax(20, 16), 16);
+});
+
+test('getWordCountMax caps down to the grid size\'s max even when the pool is bigger', () => {
+  assert.equal(getWordCountMax(6, 500), 6);
+  assert.equal(getWordCountMax(10, 500), 30);
+  assert.equal(getWordCountMax(20, 500), 50);
+});
+
+test('getWordCountMax never hardcodes a pool size: it tracks whatever poolSize is passed in', () => {
+  assert.equal(getWordCountMax(10, 1), 1);
+  assert.equal(getWordCountMax(10, 0), 0);
+  assert.equal(getWordCountMax(20, 3), 3);
+});
+
+test('getWordCountMax throws for an unsupported grid size', () => {
+  assert.throws(() => getWordCountMax(7, 10), RangeError);
+});
+
+test('getWordCountMax throws for an invalid pool size', () => {
+  assert.throws(() => getWordCountMax(10, -1), TypeError);
+  assert.throws(() => getWordCountMax(10, 1.5), TypeError);
 });

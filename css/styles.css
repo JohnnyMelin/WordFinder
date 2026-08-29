@@ -19,6 +19,75 @@ h1 {
   color: #555;
 }
 
+.screen[hidden] {
+  display: none;
+}
+
+#start-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 20rem;
+}
+
+.grid-size-field {
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.grid-size-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.grid-size-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.word-count-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.word-count-field input {
+  font-size: 1rem;
+  padding: 0.4rem 0.5rem;
+  width: 6rem;
+}
+
+#start-button {
+  align-self: flex-start;
+  font-size: 1rem;
+  padding: 0.5rem 1.25rem;
+  cursor: pointer;
+}
+
+.puzzle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: max-content;
+  margin-bottom: 1.5rem;
+}
+
+.puzzle-header .theme {
+  margin: 0;
+}
+
+#new-puzzle-button {
+  font-size: 0.95rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
 .puzzle-layout {
   display: flex;
   flex-wrap: wrap;
