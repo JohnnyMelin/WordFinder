@@ -5,25 +5,48 @@
 // tested directly with Node's built-in test runner and reused by any
 // future UI or platform. All rendering and DOM work belongs in ui.js.
 //
-// Ticket 01 scope: words are placed horizontally, left-to-right only, at
-// non-overlapping positions. Vertical/diagonal directions and overlap
-// support are added in later tickets.
+// Ticket 03 scope: words are placed in a random one of the 8 classic
+// word-search directions (horizontal/vertical/diagonal, each forward or
+// reversed) at a random position, and are allowed to overlap an
+// already-placed word wherever both words' letters agree at the shared
+// cell.
 
 const DEFAULT_GRID_SIZE = 10;
 const FILLER_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
+// The 8 classic word-search directions, expressed as the per-step
+// (row, col) delta used to walk from one letter of a word to the next.
+// `name` is the direction recorded on a Placement and is a compass
+// abbreviation for the step vector (E = east/left-to-right, S = south/
+// top-to-bottom, SE = south-east diagonal, etc.) — it carries no meaning
+// beyond "this is the vector cells[i] -> cells[i+1] follows".
+const DIRECTIONS = [
+  { name: 'E', dRow: 0, dCol: 1 },
+  { name: 'W', dRow: 0, dCol: -1 },
+  { name: 'S', dRow: 1, dCol: 0 },
+  { name: 'N', dRow: -1, dCol: 0 },
+  { name: 'SE', dRow: 1, dCol: 1 },
+  { name: 'SW', dRow: 1, dCol: -1 },
+  { name: 'NE', dRow: -1, dCol: 1 },
+  { name: 'NW', dRow: -1, dCol: -1 },
+];
+
 /**
  * @typedef {Object} Placement
  * @property {string} word - the placed word, uppercase.
- * @property {'horizontal'} direction - reading direction of the word.
+ * @property {'E'|'W'|'S'|'N'|'SE'|'SW'|'NE'|'NW'} direction - compass
+ *   abbreviation for the (row, col) step vector from each cell to the
+ *   next; e.g. 'E' steps (0, +1) per letter, 'SW' steps (+1, -1).
  * @property {{row: number, col: number}[]} cells - cells the word
  *   occupies, in reading order (cells[0] is the word's first letter).
  */
 
 /**
- * Generates a word-search puzzle: places every word in `words`
- * horizontally, left-to-right, at a non-overlapping position in a square
- * grid, then fills every remaining cell with a random filler letter.
+ * Generates a word-search puzzle: places every word in `words` in a
+ * random one of the 8 classic directions at a random position in a
+ * square grid — allowing a word to overlap another already-placed word
+ * wherever their letters agree at the shared cell — then fills every
+ * remaining cell with a random filler letter.
  *
  * @param {string[]} words - words to place; normalized to uppercase.
  * @param {number} [gridSize] - width/height of the square grid.
@@ -38,7 +61,7 @@ export function generatePuzzle(words, gridSize = DEFAULT_GRID_SIZE) {
   }
 
   const normalizedWords = words.map((word) => String(word).trim().toUpperCase());
-  const { grid, placements } = placeWordsHorizontally(normalizedWords, gridSize);
+  const { grid, placements } = placeWords(normalizedWords, gridSize);
   fillRemainingCells(grid);
 
   return { grid, placements };
@@ -49,8 +72,9 @@ function createEmptyGrid(gridSize) {
 }
 
 const MAX_GRID_ATTEMPTS = 50;
+const MAX_WORD_ATTEMPTS = 200;
 
-function placeWordsHorizontally(words, gridSize) {
+function placeWords(words, gridSize) {
   const tooLong = words.find((word) => word.length > gridSize);
   if (tooLong) {
     throw new Error(
@@ -68,7 +92,10 @@ function placeWordsHorizontally(words, gridSize) {
   // to go, even though a different arrangement would have fit everything.
   // Rather than backtrack mid-placement, retry the whole grid from
   // scratch with a fresh random layout — cheap, and reliable in practice
-  // for grids with reasonable slack.
+  // for grids with reasonable slack. Allowing overlaps (see canPlaceAt)
+  // makes this even more reliable than in the horizontal-only ticket 01
+  // version, since a word can now share cells with words already placed
+  // instead of needing entirely empty ones.
   for (let attempt = 0; attempt < MAX_GRID_ATTEMPTS; attempt++) {
     const grid = createEmptyGrid(gridSize);
     const placements = [];
@@ -80,7 +107,7 @@ function placeWordsHorizontally(words, gridSize) {
         allPlaced = false;
         break;
       }
-      placements.push(placeWordAt(grid, word, spot.row, spot.col));
+      placements.push(placeWordAt(grid, word, spot.row, spot.col, spot.direction));
     }
 
     if (allPlaced) {
@@ -93,44 +120,92 @@ function placeWordsHorizontally(words, gridSize) {
   );
 }
 
+/**
+ * Finds a direction + starting position to place `word` at, trying random
+ * direction/position combinations first (for a varied-looking layout),
+ * then falling back to an exhaustive deterministic scan over every
+ * direction and position so the word still gets placed whenever any legal
+ * spot exists anywhere in the grid, even if the random attempts above got
+ * unlucky (e.g. a crowded grid with only one or two overlap-friendly
+ * spots left).
+ */
 function findSpotForWord(grid, word, gridSize) {
-  const maxCol = gridSize - word.length;
-  if (maxCol < 0) return null;
-
-  // Try random positions first, for a varied-looking layout.
-  const maxAttempts = 200;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const row = randomInt(gridSize);
-    const col = randomInt(maxCol + 1);
-    if (canPlaceAt(grid, word, row, col)) return { row, col };
+  for (let attempt = 0; attempt < MAX_WORD_ATTEMPTS; attempt++) {
+    const direction = DIRECTIONS[randomInt(DIRECTIONS.length)];
+    const { row, col } = randomStartFor(word, direction, gridSize);
+    if (canPlaceAt(grid, word, row, col, direction, gridSize)) {
+      return { row, col, direction };
+    }
   }
 
-  // Deterministic fallback: scan every position in order. This guarantees
-  // the word gets placed whenever a valid spot exists anywhere in the
-  // grid, even if the random attempts above got unlucky.
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col <= maxCol; col++) {
-      if (canPlaceAt(grid, word, row, col)) return { row, col };
+  for (const direction of DIRECTIONS) {
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        if (canPlaceAt(grid, word, row, col, direction, gridSize)) {
+          return { row, col, direction };
+        }
+      }
     }
   }
 
   return null;
 }
 
-function canPlaceAt(grid, word, row, col) {
+/**
+ * Picks a uniformly random in-bounds starting cell for `word` walking in
+ * `direction` across a `gridSize` x `gridSize` grid. Since every word is
+ * already guaranteed to be no longer than `gridSize` (checked in
+ * `placeWords`), a valid start always exists for every direction.
+ */
+function randomStartFor(word, direction, gridSize) {
+  const rowRange = startRange(direction.dRow, word.length, gridSize);
+  const colRange = startRange(direction.dCol, word.length, gridSize);
+  return {
+    row: rowRange.min + randomInt(rowRange.max - rowRange.min + 1),
+    col: colRange.min + randomInt(colRange.max - colRange.min + 1),
+  };
+}
+
+/**
+ * The inclusive range of valid starting coordinates along one axis, given
+ * that axis's step delta (-1, 0, or 1) for `word.length` steps inside a
+ * `gridSize`-wide grid. E.g. stepping -1 (walking toward index 0) means
+ * the start must be at least `word.length - 1` so the word doesn't walk
+ * off the low edge.
+ */
+function startRange(step, wordLength, gridSize) {
+  if (step === 0) return { min: 0, max: gridSize - 1 };
+  if (step > 0) return { min: 0, max: gridSize - wordLength };
+  return { min: wordLength - 1, max: gridSize - 1 };
+}
+
+/**
+ * Whether `word` can be written starting at (row, col) walking in
+ * `direction` without running off the grid or landing on a cell that's
+ * already a *different* letter. A cell already holding the *same* letter
+ * is fine — that's an intentional overlap between two crossing words.
+ */
+function canPlaceAt(grid, word, row, col, direction, gridSize) {
   for (let i = 0; i < word.length; i++) {
-    if (grid[row][col + i] !== null) return false;
+    const r = row + direction.dRow * i;
+    const c = col + direction.dCol * i;
+    if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return false;
+
+    const existing = grid[r][c];
+    if (existing !== null && existing !== word[i]) return false;
   }
   return true;
 }
 
-function placeWordAt(grid, word, row, col) {
+function placeWordAt(grid, word, row, col, direction) {
   const cells = [];
   for (let i = 0; i < word.length; i++) {
-    grid[row][col + i] = word[i];
-    cells.push({ row, col: col + i });
+    const r = row + direction.dRow * i;
+    const c = col + direction.dCol * i;
+    grid[r][c] = word[i];
+    cells.push({ row: r, col: c });
   }
-  return { word, direction: 'horizontal', cells };
+  return { word, direction: direction.name, cells };
 }
 
 function fillRemainingCells(grid) {
@@ -156,10 +231,10 @@ function randomInt(exclusiveMax) {
  * its cells run in the same order as `placement.cells` (the word's own
  * reading order) or in the exact reverse order — i.e. the player can drag
  * from either end of a word's line and it still counts. This matters
- * because a future ticket (03) starts placing words in all 8 directions
- * (not just horizontal-forward); this function makes no assumption about
- * which of those directions a placement uses, since it only ever compares
- * cell coordinates, never row/col deltas or the `direction` field.
+ * because `generatePuzzle` places words in all 8 directions (not just
+ * horizontal-forward); this function makes no assumption about which of
+ * those directions a placement uses, since it only ever compares cell
+ * coordinates, never row/col deltas or the `direction` field.
  *
  * @param {Placement[]} placements - the puzzle's word placements, as
  *   returned by `generatePuzzle`.

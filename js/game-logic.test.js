@@ -6,6 +6,22 @@ import { PLACEHOLDER_WORDS } from './data/placeholder-words.js';
 
 const SAMPLE_WORDS = ['CAT', 'DOG', 'LION', 'TIGER', 'ZEBRA'];
 
+// Per-step (row, col) vector for each of the 8 direction names
+// `generatePuzzle` can record on a placement (see game-logic.js's
+// DIRECTIONS table). Kept independently here (not imported) so the tests
+// verify the *contract* — "this direction name means this vector" — not
+// just that the engine is internally consistent with itself.
+const DIRECTION_VECTORS = {
+  E: { dRow: 0, dCol: 1 },
+  W: { dRow: 0, dCol: -1 },
+  S: { dRow: 1, dCol: 0 },
+  N: { dRow: -1, dCol: 0 },
+  SE: { dRow: 1, dCol: 1 },
+  SW: { dRow: 1, dCol: -1 },
+  NE: { dRow: -1, dCol: 1 },
+  NW: { dRow: -1, dCol: -1 },
+};
+
 test('places every requested word', () => {
   const { placements } = generatePuzzle(SAMPLE_WORDS, 10);
 
@@ -16,41 +32,106 @@ test('places every requested word', () => {
   );
 });
 
-test('every placed word is readable left-to-right at its recorded position', () => {
-  const { grid, placements } = generatePuzzle(SAMPLE_WORDS, 10);
+test('every placed word is readable along its claimed direction from its recorded position', () => {
+  // Run several times since direction/position are randomized per word.
+  for (let run = 0; run < 30; run++) {
+    const { grid, placements } = generatePuzzle(SAMPLE_WORDS, 10);
 
-  for (const placement of placements) {
-    assert.equal(placement.direction, 'horizontal');
-    assert.equal(placement.cells.length, placement.word.length);
+    for (const placement of placements) {
+      const vector = DIRECTION_VECTORS[placement.direction];
+      assert.ok(vector, `"${placement.word}" has unknown direction "${placement.direction}"`);
+      assert.equal(placement.cells.length, placement.word.length);
 
-    const row = placement.cells[0].row;
-    for (const cell of placement.cells) {
-      assert.equal(cell.row, row, `all cells of "${placement.word}" stay on one row`);
+      // Every recorded cell must sit exactly `i` steps along the claimed
+      // direction's vector from the first cell — i.e. `cells` really does
+      // trace a straight line in that direction, not just some run of
+      // matching letters.
+      const first = placement.cells[0];
+      for (let i = 0; i < placement.cells.length; i++) {
+        assert.equal(placement.cells[i].row, first.row + vector.dRow * i);
+        assert.equal(placement.cells[i].col, first.col + vector.dCol * i);
+      }
+
+      const readOut = placement.cells.map(({ row, col }) => grid[row][col]).join('');
+      assert.equal(readOut, placement.word);
     }
-    for (let i = 1; i < placement.cells.length; i++) {
-      assert.equal(
-        placement.cells[i].col,
-        placement.cells[i - 1].col + 1,
-        `"${placement.word}" cells are consecutive left-to-right columns`
-      );
-    }
-
-    const readOut = placement.cells.map(({ row, col }) => grid[row][col]).join('');
-    assert.equal(readOut, placement.word);
   }
 });
 
-test('placed words occupy disjoint cells (no overlap)', () => {
-  const { placements } = generatePuzzle(SAMPLE_WORDS, 10);
+test('words are placed in all 8 directions across enough runs', () => {
+  const seenDirections = new Set();
 
-  const seen = new Set();
-  for (const { cells, word } of placements) {
-    for (const { row, col } of cells) {
-      const key = `${row},${col}`;
-      assert.equal(seen.has(key), false, `cell ${key} used by more than one word (found again in "${word}")`);
-      seen.add(key);
+  for (let run = 0; run < 40; run++) {
+    const { placements } = generatePuzzle(PLACEHOLDER_WORDS, 10);
+    for (const { direction } of placements) {
+      seenDirections.add(direction);
     }
   }
+
+  assert.deepEqual(
+    [...seenDirections].sort(),
+    Object.keys(DIRECTION_VECTORS).sort(),
+    'expected every one of the 8 directions to show up at least once across many runs'
+  );
+});
+
+test('overlapping placements never conflict: a shared cell has the same letter for every word that uses it', () => {
+  for (let run = 0; run < 30; run++) {
+    const { placements } = generatePuzzle(PLACEHOLDER_WORDS, 10);
+    const letterAtCell = new Map();
+
+    for (const { word, cells } of placements) {
+      for (let i = 0; i < cells.length; i++) {
+        const key = `${cells[i].row},${cells[i].col}`;
+        const letter = word[i];
+        if (letterAtCell.has(key)) {
+          assert.equal(
+            letterAtCell.get(key),
+            letter,
+            `cell ${key} disagrees between overlapping words (got "${letter}" from "${word}")`
+          );
+        } else {
+          letterAtCell.set(key, letter);
+        }
+      }
+    }
+  }
+});
+
+test('crossing words actually overlap and are each independently readable', () => {
+  // A dense word list (10 short, letter-sharing words) in a small grid
+  // makes overlap likely; run it several times and require at least one
+  // run to show real overlap, so this test would fail if overlap support
+  // silently regressed into "always find a fully empty spot" behavior.
+  const DENSE_WORDS = ['ANT', 'BAT', 'CAT', 'RAT', 'HAT', 'MAT', 'SAT', 'PAT', 'FAT', 'OAT'];
+  let sawOverlap = false;
+
+  for (let run = 0; run < 15 && !sawOverlap; run++) {
+    const { grid, placements } = generatePuzzle(DENSE_WORDS, 6);
+
+    assert.equal(placements.length, DENSE_WORDS.length, 'all dense words still get placed');
+
+    const usedCells = new Set();
+    let totalCellUses = 0;
+    for (const { cells } of placements) {
+      totalCellUses += cells.length;
+      for (const { row, col } of cells) {
+        usedCells.add(`${row},${col}`);
+      }
+    }
+    if (usedCells.size < totalCellUses) sawOverlap = true;
+
+    // Regardless of whether this particular run overlapped, every word
+    // must still read correctly along its own claimed direction.
+    for (const placement of placements) {
+      const vector = DIRECTION_VECTORS[placement.direction];
+      const readOut = placement.cells.map(({ row, col }) => grid[row][col]).join('');
+      assert.equal(readOut, placement.word);
+      assert.ok(vector);
+    }
+  }
+
+  assert.equal(sawOverlap, true, 'expected at least one run of a dense word list to produce an overlapping placement');
 });
 
 test('all cells are filled with a letter, no blanks', () => {
