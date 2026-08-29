@@ -34,6 +34,10 @@ h1 {
   background: #ccc;
   border: 2px solid #333;
   width: max-content;
+  /* Selection is driven entirely by Pointer Events; suppress the
+     browser's own touch scrolling/panning and text-selection gestures
+     while the player is dragging across cells. */
+  touch-action: none;
 }
 
 .grid-cell {
@@ -47,6 +51,31 @@ h1 {
   font-size: 1.1rem;
   text-transform: uppercase;
   user-select: none;
+  cursor: pointer;
+}
+
+.grid-cell.selecting {
+  background: #ffe066;
+}
+
+.grid-cell.found {
+  background: #7bc67e;
+  color: #123a1a;
+}
+
+.win-banner {
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  max-width: max-content;
+  background: #d7f5d0;
+  border: 2px solid #3a9c3f;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  color: #1c5c1f;
+}
+
+.win-banner[hidden] {
+  display: none;
 }
 
 .word-panel {
@@ -71,4 +100,9 @@ h1 {
   font-family: 'Courier New', monospace;
   font-size: 1rem;
   letter-spacing: 0.05em;
+}
+
+.word-list-item.found {
+  text-decoration: line-through;
+  color: #888;
 }

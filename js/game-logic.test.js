@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { generatePuzzle } from './game-logic.js';
+import { generatePuzzle, checkSelection } from './game-logic.js';
 import { PLACEHOLDER_WORDS } from './data/placeholder-words.js';
 
 const SAMPLE_WORDS = ['CAT', 'DOG', 'LION', 'TIGER', 'ZEBRA'];
@@ -91,4 +91,72 @@ test('the full placeholder word list places into a 10x10 grid without error', ()
 
 test('throws when a word cannot possibly fit in the grid', () => {
   assert.throws(() => generatePuzzle(['LONGERWORDTHANGRID'], 10));
+});
+
+test('checkSelection matches a selection made in the word\'s own reading order', () => {
+  const placements = [
+    { word: 'CAT', direction: 'horizontal', cells: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }] },
+    { word: 'DOG', direction: 'horizontal', cells: [{ row: 2, col: 4 }, { row: 2, col: 5 }, { row: 2, col: 6 }] },
+  ];
+
+  const match = checkSelection(placements, [
+    { row: 0, col: 0 },
+    { row: 0, col: 1 },
+    { row: 0, col: 2 },
+  ]);
+
+  assert.equal(match, 'CAT');
+});
+
+test('checkSelection matches a selection made in the reverse direction along the word\'s line', () => {
+  const placements = [
+    { word: 'CAT', direction: 'horizontal', cells: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }] },
+  ];
+
+  const match = checkSelection(placements, [
+    { row: 0, col: 2 },
+    { row: 0, col: 1 },
+    { row: 0, col: 0 },
+  ]);
+
+  assert.equal(match, 'CAT');
+});
+
+test('checkSelection returns no match for a selection that does not correspond to any placed word', () => {
+  const placements = [
+    { word: 'CAT', direction: 'horizontal', cells: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }] },
+  ];
+
+  const match = checkSelection(placements, [
+    { row: 5, col: 0 },
+    { row: 5, col: 1 },
+    { row: 5, col: 2 },
+  ]);
+
+  assert.equal(match, null);
+});
+
+test('checkSelection returns no match for a partial (subset) selection of a placed word', () => {
+  const placements = [
+    { word: 'TIGER', direction: 'horizontal', cells: [{ row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 }, { row: 1, col: 4 }] },
+  ];
+
+  const match = checkSelection(placements, [
+    { row: 1, col: 0 },
+    { row: 1, col: 1 },
+    { row: 1, col: 2 },
+  ]);
+
+  assert.equal(match, null);
+});
+
+test('checkSelection works end-to-end against a generated puzzle, in either direction', () => {
+  const { placements } = generatePuzzle(SAMPLE_WORDS, 10);
+  const target = placements[0];
+
+  const forwardMatch = checkSelection(placements, target.cells);
+  assert.equal(forwardMatch, target.word);
+
+  const reverseMatch = checkSelection(placements, [...target.cells].reverse());
+  assert.equal(reverseMatch, target.word);
 });

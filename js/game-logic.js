@@ -146,3 +146,46 @@ function fillRemainingCells(grid) {
 function randomInt(exclusiveMax) {
   return Math.floor(Math.random() * exclusiveMax);
 }
+
+/**
+ * Checks a player's selected run of grid cells against the puzzle's word
+ * placements, returning the word it matches (or `null` if it matches
+ * none).
+ *
+ * Direction-tolerant by design: a selection matches a placement whether
+ * its cells run in the same order as `placement.cells` (the word's own
+ * reading order) or in the exact reverse order — i.e. the player can drag
+ * from either end of a word's line and it still counts. This matters
+ * because a future ticket (03) starts placing words in all 8 directions
+ * (not just horizontal-forward); this function makes no assumption about
+ * which of those directions a placement uses, since it only ever compares
+ * cell coordinates, never row/col deltas or the `direction` field.
+ *
+ * @param {Placement[]} placements - the puzzle's word placements, as
+ *   returned by `generatePuzzle`.
+ * @param {{row: number, col: number}[]} selectedCells - the cells the
+ *   player selected, in the order they dragged across them.
+ * @returns {string | null} the matched word, or `null` if the selection
+ *   doesn't correspond to any placement (in either direction).
+ */
+export function checkSelection(placements, selectedCells) {
+  if (!Array.isArray(placements) || !Array.isArray(selectedCells)) return null;
+  if (selectedCells.length === 0) return null;
+
+  for (const placement of placements) {
+    if (placement.cells.length !== selectedCells.length) continue;
+
+    if (
+      sameCellSequence(placement.cells, selectedCells) ||
+      sameCellSequence(placement.cells, [...selectedCells].reverse())
+    ) {
+      return placement.word;
+    }
+  }
+
+  return null;
+}
+
+function sameCellSequence(a, b) {
+  return a.every((cell, i) => cell.row === b[i].row && cell.col === b[i].col);
+}
