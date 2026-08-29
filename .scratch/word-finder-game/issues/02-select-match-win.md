@@ -1,0 +1,16 @@
+# 02: Select, match, and win
+
+**What to build:** Turns the static grid from ticket 01 into an actually playable puzzle. `checkSelection` takes the puzzle's placements and a selected run of cells and returns the matched word (or none) — written direction-tolerant from the start (matches a selection made in either direction along a word's line) even though ticket 01's puzzles are currently horizontal-forward only, since ticket 03 will start producing puzzles in the other 7 directions against this same function. The puzzle screen wires up Pointer Events so the player can click-drag (mouse) or touch-drag (touch) across the grid; a correct selection highlights the matched cells and marks the word off the list. Once every word is found, the game shows a win state.
+
+**Blocked by:** 01
+
+**Status:** ready-for-agent
+
+- [ ] `checkSelection` matches a straight-line selection against the puzzle's placements, tolerant of either direction along the word's line
+- [ ] `checkSelection` returns no match for a selection that doesn't correspond to any placed word
+- [ ] Unit tests cover matching and non-matching selections, including both directions along a placed word
+- [ ] Click-drag (mouse) and touch-drag (touch) both select a run of cells via Pointer Events, one shared code path
+- [ ] A correct selection highlights the matched cells in the grid and marks the word off the visible word list
+- [ ] An incorrect/non-matching selection does not mark anything off
+- [ ] Finding every word in the list triggers a visible win state
+- [ ] The horizontal-forward puzzle from ticket 01 is fully playable start-to-finish in a browser
