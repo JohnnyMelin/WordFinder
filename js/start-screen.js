@@ -28,6 +28,47 @@ const DEFAULT_GRID_SIZE = 10;
 const DEFAULT_WORD_COUNT = 10;
 
 /**
+ * Renders one radio-button group (a label wrapping a radio input, per
+ * item) into `container`, replacing whatever was there before. The
+ * grid-size group and the theme group share this exact DOM shape and
+ * only differ in the field name, the source items, and how a value/label
+ * is pulled from each item — those differences are the callbacks below.
+ *
+ * @param {HTMLElement} container - element the radio labels are appended to.
+ * @param {Object} options
+ * @param {string} options.name - the radio group's shared `name` attribute.
+ * @param {string} options.className - class name(s) applied to each `<label>`.
+ * @param {any[]} options.items - the choices to render, in order.
+ * @param {(item: any) => string|number} options.toValue - the radio
+ *   input's `value` for an item.
+ * @param {(item: any) => string} options.toLabel - the visible label text
+ *   for an item.
+ * @param {(item: any) => boolean} options.isChecked - whether an item
+ *   should start out checked.
+ * @param {(event: Event) => void} options.onChange - listener attached to
+ *   every radio's `change` event.
+ */
+function renderRadioGroup(container, { name, className, items, toValue, toLabel, isChecked, onChange }) {
+  container.replaceChildren();
+
+  for (const item of items) {
+    const label = document.createElement('label');
+    label.className = className;
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = name;
+    radio.value = String(toValue(item));
+    radio.checked = isChecked(item);
+    radio.addEventListener('change', onChange);
+
+    label.appendChild(radio);
+    label.append(` ${toLabel(item)}`);
+    container.appendChild(label);
+  }
+}
+
+/**
  * Renders the grid-size and theme radio choices and wires up the
  * word-count input and the start form so that submitting it calls
  * `onStart` with the player's chosen `{ gridSize, theme, wordCount }`.
@@ -60,43 +101,27 @@ export function initStartScreen({
   getPoolSize,
   onStart,
 }) {
-  gridSizeContainer.replaceChildren();
-
-  for (const choice of GRID_SIZE_CHOICES) {
-    const label = document.createElement('label');
-    label.className = 'grid-size-choice';
-
-    const radio = document.createElement('input');
-    radio.type = 'radio';
-    radio.name = 'grid-size';
-    radio.value = String(choice.value);
-    radio.checked = choice.value === DEFAULT_GRID_SIZE;
-    radio.addEventListener('change', syncWordCountMax);
-
-    label.appendChild(radio);
-    label.append(` ${choice.label}`);
-    gridSizeContainer.appendChild(label);
-  }
+  renderRadioGroup(gridSizeContainer, {
+    name: 'grid-size',
+    className: 'choice grid-size-choice',
+    items: GRID_SIZE_CHOICES,
+    toValue: (choice) => choice.value,
+    toLabel: (choice) => choice.label,
+    isChecked: (choice) => choice.value === DEFAULT_GRID_SIZE,
+    onChange: syncWordCountMax,
+  });
 
   const defaultTheme = themes[0];
 
-  themeContainer.replaceChildren();
-
-  for (const theme of themes) {
-    const label = document.createElement('label');
-    label.className = 'theme-choice';
-
-    const radio = document.createElement('input');
-    radio.type = 'radio';
-    radio.name = 'theme';
-    radio.value = theme;
-    radio.checked = theme === defaultTheme;
-    radio.addEventListener('change', syncWordCountMax);
-
-    label.appendChild(radio);
-    label.append(` ${theme}`);
-    themeContainer.appendChild(label);
-  }
+  renderRadioGroup(themeContainer, {
+    name: 'theme',
+    className: 'choice theme-choice',
+    items: themes,
+    toValue: (theme) => theme,
+    toLabel: (theme) => theme,
+    isChecked: (theme) => theme === defaultTheme,
+    onChange: syncWordCountMax,
+  });
 
   function selectedGridSize() {
     const checked = gridSizeContainer.querySelector('input[name="grid-size"]:checked');

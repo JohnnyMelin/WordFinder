@@ -1,11 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { generatePuzzle, checkSelection, getWordCountMax, GRID_SIZE_WORD_COUNT_MAX } from './game-logic.js';
-import { PLACEHOLDER_WORDS } from './data/placeholder-words.js';
 import { THEMES } from './data/themes.js';
 
+// The pre-generated Random/Any word pool (see data/random-words.json's
+// generating script, scripts/generate-random-words.js). Loaded straight
+// off disk with fs/URL rather than imported as JSON, since this is a
+// plain-JS test file with no JSON-module loader configured.
+const RANDOM_WORDS = JSON.parse(
+  readFileSync(new URL('../data/random-words.json', import.meta.url), 'utf8')
+);
+
 const SAMPLE_WORDS = ['CAT', 'DOG', 'LION', 'TIGER', 'ZEBRA'];
+
+// A small, fixed word list for tests that just need "a bunch of real
+// short-to-medium words", without depending on a bespoke fixture file.
+// Used to be its own hardcoded list (js/data/placeholder-words.js, from
+// ticket 01's walking skeleton); once ticket 05 replaced the UI's use of
+// it with the curated theme data, it was only ever imported by this test
+// file, so it was retired in favor of slicing the real Animals data below.
+const PLACEHOLDER_WORDS = THEMES.Animals.slice(0, 16);
 
 // Per-step (row, col) vector for each of the 8 direction names
 // `generatePuzzle` can record on a placement (see game-logic.js's
@@ -365,3 +381,48 @@ for (const gridSize of Object.keys(GRID_SIZE_WORD_COUNT_MAX).map(Number)) {
     });
   }
 }
+
+// --- Random/Any smoke test -------------------------------------------
+//
+// STRESS_THEMES above deliberately excludes Random/Any. spec.md's
+// "Known limitation (deferred, not fixed)" note (under Further Notes)
+// documents a rare but real multi-second worst-case latency in
+// generatePuzzle specifically for Random/Any's fully-random word
+// samples at high word counts — measured up to 26s at 20x20/45 words —
+// because generic random words lack the letter-correlation curated
+// theme words have. That's a known, deliberately deferred finding, not
+// something to paper over by running Random/Any through the same
+// hundreds-of-iterations stress test as the curated themes above: that
+// would make this suite unacceptably slow and would still only be a
+// partial characterization of a highly variable worst case.
+//
+// This test instead closes the narrower gap that Random/Any is never
+// exercised by generatePuzzle *at all*: a small, fixed handful of runs
+// (not hundreds) at 20x20's word-count max — the grid size/theme
+// combination the known limitation is about — asserting only that
+// generation eventually succeeds. This is NOT a timing assertion and
+// NOT a reliability guarantee at scale; see spec.md's Known Limitation
+// note for the latency caveat this deliberately does not attempt to fix
+// or fully characterize.
+const RANDOM_ANY_SMOKE_ITERATIONS = 5;
+
+test(
+  `generatePuzzle succeeds with a Random/Any word sample at 20x20's word-count max ` +
+    `(${RANDOM_ANY_SMOKE_ITERATIONS} runs, deliberately small — see spec.md's Known Limitation note)`,
+  () => {
+    const gridSize = 20;
+    const poolSize = RANDOM_WORDS.filter((word) => word.length <= gridSize).length;
+    const wordCount = getWordCountMax(gridSize, poolSize);
+    assert.ok(wordCount > 0, 'expected the Random/Any pool to have at least one word <= 20 letters');
+
+    for (let i = 0; i < RANDOM_ANY_SMOKE_ITERATIONS; i++) {
+      const words = pickWords(RANDOM_WORDS, gridSize, wordCount);
+      const { placements } = generatePuzzle(words, gridSize);
+      assert.equal(
+        placements.length,
+        words.length,
+        'every requested word must actually be placed, not silently dropped'
+      );
+    }
+  }
+);

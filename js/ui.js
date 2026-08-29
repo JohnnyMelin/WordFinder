@@ -15,58 +15,13 @@
 //
 // Word source: the six curated theme lists in data/themes.js (ticket
 // 05), plus a seventh "Random/Any" theme (ticket 06) whose words come
-// from data/random-words.json — a static JSON file generated ahead of
-// time by the dev-only scripts/generate-random-words.js from the
-// `word-list` npm package (see that script's header comment) and fetched
-// here at runtime, exactly like the spec describes ("the deployed site
-// fetches this static JSON exactly like a curated theme file"). This is
-// the only module that knows the pool's shape (a theme-name -> word-list
-// map, curated themes imported directly, Random/Any fetched); start-
-// screen.js stays generic by taking the theme names and a
-// getPoolSize(gridSize, theme) callback as options instead of importing
-// or fetching theme data itself.
+// from data/random-words.json. Fetching and resolving that pool data
+// lives in word-pools.js (loadRandomWords/poolFor/poolSizeFor), imported
+// below; this module just calls into it to pick words for a puzzle.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
-import { THEMES } from './data/themes.js';
 import { initStartScreen } from './start-screen.js';
-
-const RANDOM_THEME_NAME = 'Random/Any';
-const RANDOM_WORDS_URL = 'data/random-words.json';
-
-const THEME_NAMES = [...Object.keys(THEMES), RANDOM_THEME_NAME];
-
-// Populated by loadRandomWords() before initStartScreen() is called, so
-// every synchronous lookup below (poolFor, poolSizeFor, startPuzzle) can
-// treat Random/Any's pool exactly like a curated theme's — no async
-// creeping into the rest of the module. Stays [] (an empty, always-valid
-// pool) if the fetch fails, so a network hiccup degrades to "Random/Any
-// has 0 qualifying words" rather than crashing start-up.
-let randomWordsPool = [];
-
-/**
- * Fetches the pre-generated Random/Any word pool. Static JSON, fetched
- * once at start-up — no npm package, build step, or server-side code at
- * runtime (per spec.md's Random/Any word data decision).
- */
-async function loadRandomWords() {
-  try {
-    const response = await fetch(RANDOM_WORDS_URL);
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-    const words = await response.json();
-    return Array.isArray(words) ? words : [];
-  } catch (error) {
-    console.error(`Failed to load ${RANDOM_WORDS_URL}:`, error);
-    return [];
-  }
-}
-
-/** Looks up `theme`'s word pool, curated or Random/Any alike. */
-function poolFor(theme) {
-  if (theme === RANDOM_THEME_NAME) return randomWordsPool;
-  return THEMES[theme] ?? [];
-}
+import { THEME_NAMES, loadRandomWords, poolFor, poolSizeFor } from './word-pools.js';
 
 /**
  * Renders the letter grid and returns a 2D array of the cell elements,
@@ -304,17 +259,6 @@ function shuffled(list) {
   return copy;
 }
 
-/** Size of `theme`'s word pool that actually qualifies for `gridSize`
- * (i.e. fits within it). This is the generic "pool size" input to
- * getWordCountMax — looking the pool up by theme name here rather than
- * hardcoding one list means switching themes on the start screen
- * recomputes the cap against the newly selected theme's own word
- * count. Random/Any (ticket 06) needs no special case here since
- * poolFor already resolves it to the fetched word list. */
-function poolSizeFor(gridSize, theme) {
-  return poolFor(theme).filter((word) => word.length <= gridSize).length;
-}
-
 /** Shows exactly one of the top-level `.screen` sections (by element id)
  * and hides the rest, so start <-> puzzle transitions never require a
  * page reload. */
@@ -362,8 +306,9 @@ async function init() {
   // Awaited before initStartScreen so every theme (including Random/Any)
   // is fully ready before the player can interact with the theme
   // selector — no async creeps past this point into start-screen.js or
-  // startPuzzle's synchronous pool lookups.
-  randomWordsPool = await loadRandomWords();
+  // startPuzzle's synchronous pool lookups. loadRandomWords (word-pools.js)
+  // populates its own internal pool, which poolFor/poolSizeFor then read.
+  await loadRandomWords();
 
   initStartScreen({
     form: document.getElementById('start-form'),

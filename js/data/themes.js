@@ -6,9 +6,9 @@
 // even on the 14-letter allowance). Words are single alphabetic tokens
 // (no spaces or hyphens, since a word-search grid cell holds one letter);
 // a naturally multi-word thing is either skipped or written as one
-// natural token. Stored uppercase for consistency with
-// `data/placeholder-words.js`'s style, though `game-logic.js` normalizes
-// to uppercase itself, so callers don't strictly depend on that casing.
+// natural token. Stored uppercase for consistency, though `game-logic.js`
+// normalizes to uppercase itself, so callers don't strictly depend on
+// that casing.
 //
 // `THEMES` is the source of truth ui.js/start-screen.js draw from; the
 // six curated theme names (in display order) are `Object.keys(THEMES)`.
