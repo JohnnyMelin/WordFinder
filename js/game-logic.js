@@ -264,3 +264,38 @@ export function checkSelection(placements, selectedCells) {
 function sameCellSequence(a, b) {
   return a.every((cell, i) => cell.row === b[i].row && cell.col === b[i].col);
 }
+
+// Per spec: the maximum word count offered for each supported grid size,
+// keeping a generated puzzle legible without overcrowding the grid.
+export const GRID_SIZE_WORD_COUNT_MAX = {
+  6: 6,
+  10: 30,
+  20: 50,
+};
+
+/**
+ * The maximum word count the start screen should allow for `gridSize`,
+ * further capped down to `poolSize` when the active word pool (theme)
+ * has fewer qualifying words than the grid size's own maximum — so
+ * picking an under-stocked pool never produces a word count the engine
+ * can't fulfill. Deliberately generic: callers pass in whatever the
+ * current pool's size actually is, so this keeps working unchanged once
+ * more themes/pools of varying sizes exist (see spec.md's word-count
+ * capping decision).
+ *
+ * @param {number} gridSize - one of the supported grid sizes (currently
+ *   6, 10, or 20).
+ * @param {number} poolSize - number of qualifying words in the active
+ *   word pool.
+ * @returns {number} the smaller of the grid size's max and `poolSize`.
+ */
+export function getWordCountMax(gridSize, poolSize) {
+  const sizeMax = GRID_SIZE_WORD_COUNT_MAX[gridSize];
+  if (sizeMax === undefined) {
+    throw new RangeError(`getWordCountMax: unsupported grid size ${gridSize}`);
+  }
+  if (!Number.isInteger(poolSize) || poolSize < 0) {
+    throw new TypeError('getWordCountMax: poolSize must be a non-negative integer');
+  }
+  return Math.min(sizeMax, poolSize);
+}
