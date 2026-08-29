@@ -65,4 +65,8 @@ A static, buildless web app (plain HTML/CSS/JS) with two screens:
 - Source spec: `plan.md` at the repo root (unchanged by this spec; this file is the actionable synthesis of it).
 - This is a fresh repo with no existing code, so there are no existing seams to prefer over the one proposed above.
 
+### Known limitation (deferred, not fixed): Random/Any latency at high word counts
+
+`generatePuzzle`'s packing algorithm (tuned in ticket 07 against curated themes) has an unbounded worst-case latency. Curated theme words tend to share letters with each other, giving the overlap-seeking algorithm easy candidates; a fully random sample from the Random/Any pool (`data/random-words.json`) often doesn't. Measured directly: at 20x20/45 words with Random/Any, most puzzles generate in under 150ms, but occasional draws took 4.4s and 26s (2 of 5 sampled runs) — long enough to look like a frozen page to a player, with no defensive timeout or fallback in `ui.js`. Curated themes were not observed to hit this because their word lists are small (~100 words) and internally letter-correlated. This was found and deliberately deferred (not fixed) during implementation — see ticket 07's completion notes for the reliability work that was done, and consider a follow-up ticket for a hard wall-clock generation budget with graceful fallback before this ships broadly.
+
 ## Comments

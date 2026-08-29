@@ -1,0 +1,12 @@
+# 07: Robust puzzle generation at max word count
+
+**What to build:** `generatePuzzle` currently fails (throws) reliably when asked to place a word count near the advertised per-grid-size maximum from `plan.md`/the spec (6x6→6, 10x10→30, 20x20→50) — confirmed via testing: 30 words from the Sports theme into a 10x10 grid fails 10/10 times. Since the start screen (ticket 04) lets the player select any count up to that max, this is a real crash path with no user-facing feedback. Fix it so `generatePuzzle` reliably succeeds for every grid-size/word-count combination the start screen can offer, across all themes (curated + Random/Any once ticket 06 lands) — via a stronger packing algorithm (e.g. placing longer/harder-to-fit words first, real backtracking across words rather than only per-word retry with a whole-grid restart), and/or by re-deriving the per-grid-size word-count maximums (`GRID_SIZE_WORD_COUNT_MAX` in `game-logic.js`) empirically so the UI never offers a count that can't reliably be delivered. Either approach (or a combination) is acceptable — the acceptance criteria are about the observable guarantee, not the specific algorithm.
+
+**Blocked by:** 05 (needs the curated theme data to test realistic word pools against; can run concurrently with 06 since both only depend on 05 and touch largely disjoint files — coordinate if `game-logic.js`'s `getWordCountMax`/`GRID_SIZE_WORD_COUNT_MAX` needs to change shape)
+
+**Status:** ready-for-agent
+
+- [ ] A stress test (checked into `game-logic.test.js`, at least hundreds of iterations, fast enough to stay part of the normal `node --test` run) covers every grid size × its own word-count max × every curated theme (and Random/Any once available), asserting zero `generatePuzzle` failures
+- [ ] If the fix involves lowering `GRID_SIZE_WORD_COUNT_MAX` for a grid size, the new max is itself validated by the stress test at that new max (not just spot-checked)
+- [ ] `js/ui.js`'s puzzle-start path has no uncaught-throw path from `generatePuzzle` for any selection reachable through the start screen
+- [ ] Existing tests (placement correctness, direction coverage, overlap non-conflict, `checkSelection`) still pass unchanged in behavior

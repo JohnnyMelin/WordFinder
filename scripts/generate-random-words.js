@@ -29,10 +29,12 @@
 // via this repo's npm-workaround) ships a much larger source list
 // (~274k raw entries, ~264k after the 3-14/alphabetic filter) than the
 // spec's estimate, which appears to describe an older release of the
-// package. This script uses the full filtered list from whatever version
-// is installed rather than an arbitrary hand-picked subset, so it stays
-// correct if the installed package version changes; see the ticket 06
-// completion report for the actual final count.
+// package. Rather than shipping a multi-megabyte static JSON fetched at
+// runtime, this script randomly samples the filtered list down to
+// TARGET_COUNT (matching the spec's original ~15,600 estimate) so the
+// Random/Any theme's asset stays a comparable order of magnitude to the
+// package's originally-intended size, and to a lesser extent the curated
+// themes (~100 words each) it's meant to sit alongside.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,6 +47,7 @@ const OUTPUT_PATH = path.join(__dirname, '..', 'data', 'random-words.json');
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 14;
 const ALPHA_ONLY = /^[A-Za-z]+$/;
+const TARGET_COUNT = 15600;
 
 function main() {
   const raw = fs.readFileSync(wordListPath, 'utf8');
@@ -57,7 +60,9 @@ function main() {
 
   // De-dupe defensively (the source list has none, but uppercasing could
   // theoretically collapse two distinct entries onto the same word).
-  const words = Array.from(new Set(filtered));
+  const deduped = Array.from(new Set(filtered));
+
+  const words = sample(deduped, TARGET_COUNT).sort();
 
   verify(words);
 
@@ -65,7 +70,19 @@ function main() {
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(words));
 
   console.log(`Read ${rawWords.length} raw words from word-list.`);
-  console.log(`Wrote ${words.length} words to ${path.relative(process.cwd(), OUTPUT_PATH)}.`);
+  console.log(`Filtered to ${deduped.length} words (3-14 letters, alphabetic, deduped).`);
+  console.log(`Sampled down to ${words.length} words, wrote to ${path.relative(process.cwd(), OUTPUT_PATH)}.`);
+}
+
+/** Fisher-Yates partial shuffle, returns the first `count` entries. */
+function sample(list, count) {
+  if (list.length <= count) return list.slice();
+  const pool = list.slice();
+  for (let i = pool.length - 1; i > pool.length - 1 - count; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(pool.length - count);
 }
 
 /**
