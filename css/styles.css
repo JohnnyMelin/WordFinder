@@ -30,40 +30,26 @@ h1 {
   max-width: 20rem;
 }
 
-.grid-size-field {
+/* Shared by the grid-size and theme fieldsets/radio groups on the start
+   screen (formerly two byte-identical rule pairs each: .grid-size-field/
+   .theme-field, .grid-size-choices/.theme-choices,
+   .grid-size-choice/.theme-choice). index.html and start-screen.js keep
+   the specific class names alongside these as hooks; only the shared
+   declarations live here now. */
+.field {
   border: 1px solid #ccc;
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
 }
 
-.grid-size-choices {
+.choice-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
 
-.grid-size-choice {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.theme-field {
-  border: 1px solid #ccc;
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-}
-
-.theme-choices {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.theme-choice {
+.choice {
   display: flex;
   align-items: center;
   gap: 0.5rem;
