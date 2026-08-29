@@ -6,5 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test"
+  },
+  "devDependencies": {
+    "word-list": "^4.1.0"
   }
 }
