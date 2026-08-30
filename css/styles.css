@@ -1,5 +1,11 @@
 :root {
   color-scheme: light dark;
+
+  /* The app's accent color (introduced with ticket 09's Line-mode
+     display): a fully-saturated version of the same golden hue already
+     used for .grid-cell.selecting's highlight background below, now used
+     as a bold stroke color for the live drag-selection line. */
+  --accent-color: hsl(42, 100%, 50%);
 }
 
 body {
@@ -133,6 +139,73 @@ h1 {
      browser's own touch scrolling/panning and text-selection gestures
      while the player is dragging across cells. */
   touch-action: none;
+  /* Anchors the Line-mode SVG overlay below: its `inset: 0` positions it
+     against this element's padding edge, the same origin ui.js's
+     createLineRenderer uses for each cell's offsetLeft/offsetTop, so
+     overlay coordinates and cell centers line up. Absolutely positioned
+     children (the overlay) don't participate in this element's grid
+     layout, so this has no effect on cell placement. */
+  position: relative;
+}
+
+/* Line-mode selection display (ticket 09): an SVG overlay sized to fill
+   .grid, sitting above the letter cells (later in DOM order) but with
+   pointer-events disabled so it never interferes with the cell hit-
+   testing setupSelection's drag handling depends on. Only present when
+   Line mode is active — Highlight mode's setupSelection never creates
+   one, so these rules are inert (and the .grid layout unaffected) in
+   Highlight mode. */
+.selection-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The in-progress drag: one bold, fully-saturated line from the drag's
+   start cell to wherever the pointer currently is. Hidden (via inline
+   style, toggled by clearPreview/setPreview) whenever nothing is being
+   dragged. Drawn at normal (non-blended) full opacity, outside the
+   .found-lines group below, so it's unaffected by that group's blending/
+   opacity treatment. */
+.selection-lines .preview-line {
+  stroke: var(--accent-color);
+  stroke-width: 4px;
+  stroke-linecap: round;
+}
+
+/* Wraps every confirmed found-word line. `isolation: isolate` scopes the
+   strokes' `mix-blend-mode` (below) to blending only against each other
+   inside this group, not against the real grid backdrop behind it —
+   without it, "lighten" would blend straight against the grid cells'
+   white background, and max(white, anything) is white, making every
+   found-line render fully invisible. The `opacity` here is what actually
+   makes found-lines read as "transparent light gray": it's applied once,
+   to this group's fully-flattened result, rather than per stroke — the
+   strokes themselves are fully opaque (see .found-line), so overlapping
+   ones can never accumulate extra coverage the way separately semi-
+   transparent shapes would. That's what keeps a crossing of many
+   found-word lines exactly as light as a single one: nothing here
+   compounds, because the only place a fractional alpha exists is this
+   one group-level property, applied exactly once regardless of how many
+   lines are inside. */
+.selection-lines .found-lines {
+  isolation: isolate;
+  opacity: 0.45;
+}
+
+/* A confirmed found word: a static line from its first letter to its
+   last, with no endpoint markers. Fully opaque on its own (see
+   .found-lines above for where the actual transparency comes from) —
+   `mix-blend-mode: lighten` here only matters for the anti-aliased edge
+   pixels where two lines' boundaries cross within the isolated group,
+   keeping those consistent with the rest of the stroke too. */
+.selection-lines .found-line {
+  stroke: rgb(140, 140, 140);
+  stroke-width: 4px;
+  stroke-linecap: round;
+  mix-blend-mode: lighten;
 }
 
 .grid-cell {
