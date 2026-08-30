@@ -10,10 +10,10 @@ In Highlight mode, behavior is unchanged from today (full-tile highlighting for 
 
 **Status:** ready-for-agent
 
-- [ ] A toggle on the start screen lets the player choose "Line" or "Highlight" mode before starting a puzzle, labeled so the classic full-tile mode reads as "Highlight"
-- [ ] In Line mode, dragging a selection shows a live, fully-saturated line from the start cell to the current cell instead of a full-tile highlight
-- [ ] In Line mode, confirming a found word shows a static, transparent light-gray line from the word's first to last letter, with no endpoint markers; letter tiles show no other highlight
-- [ ] In Line mode, many overlapping found-word lines remain visually a single consistent light gray where they cross — no compounding/darkening
-- [ ] In Highlight mode, drag preview and found-word display are unchanged from today's behavior
-- [ ] The chosen mode is persisted (e.g. via `localStorage`) and restored on the next visit
-- [ ] With no stored preference (first visit), the game defaults to Line mode
+- [x] A toggle on the start screen lets the player choose "Line" or "Highlight" mode before starting a puzzle, labeled so the classic full-tile mode reads as "Highlight"
+- [x] In Line mode, dragging a selection shows a live, fully-saturated line from the start cell to the current cell instead of a full-tile highlight
+- [x] In Line mode, confirming a found word shows a static, transparent light-gray line from the word's first to last letter, with no endpoint markers; letter tiles show no other highlight
+- [x] In Line mode, many overlapping found-word lines remain visually a single consistent light gray where they cross — no compounding/darkening
+- [x] In Highlight mode, drag preview and found-word display are unchanged from today's behavior
+- [x] The chosen mode is persisted (e.g. via `localStorage`) and restored on the next visit
+- [x] With no stored preference (first visit), the game defaults to Line mode

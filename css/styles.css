@@ -232,7 +232,7 @@ h1 {
 }
 
 .win-banner {
-  margin: 0 0 1.5rem;
+  margin: 0 0 0.75rem;
   padding: 0.75rem 1rem;
   max-width: max-content;
   background: #d7f5d0;
@@ -243,6 +243,27 @@ h1 {
 }
 
 .win-banner[hidden] {
+  display: none;
+}
+
+/* #win-view-scoreboards-button lives outside #win-banner (kept out of its
+   role="status" live region) but must still read as visually attached to
+   it. Its shared .view-scoreboards-button margin-top collapses against
+   .win-banner's reduced margin-bottom to reproduce the tight spacing the
+   button had when it was rendered inside the banner; this margin-bottom
+   restores the total gap before .puzzle-layout that win-banner's original
+   1.5rem margin used to provide alone. */
+#win-view-scoreboards-button {
+  margin-bottom: 1.5rem;
+}
+
+/* .view-scoreboards-button sets display: block, which has the same
+   specificity as the browser default [hidden] { display: none } and (as
+   an author rule) beats it regardless of source order — so without this,
+   toggling the `hidden` attribute in js/ui.js would not actually hide the
+   button. .win-banner[hidden] above solves the same problem for the
+   banner. */
+#win-view-scoreboards-button[hidden] {
   display: none;
 }
 

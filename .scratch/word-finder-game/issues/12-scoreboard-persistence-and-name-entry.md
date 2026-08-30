@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Finishing a puzzle with a top-9-qualifying score (for that puzzle's grid size) prompts the player for a short name before saving
-- [ ] The entry — name, score, word count used, date achieved — is saved to the `localStorage` list matching the puzzle's grid size
-- [ ] A non-qualifying score is not saved, and the player is not prompted for a name
-- [ ] The three grid sizes' lists are independent of each other, each capped at 9 entries, with the lowest-scoring entry evicted when a new one qualifies
-- [ ] Reloading the page preserves previously saved scoreboard entries
+- [x] Finishing a puzzle with a top-9-qualifying score (for that puzzle's grid size) prompts the player for a short name before saving
+- [x] The entry — name, score, word count used, date achieved — is saved to the `localStorage` list matching the puzzle's grid size
+- [x] A non-qualifying score is not saved, and the player is not prompted for a name
+- [x] The three grid sizes' lists are independent of each other, each capped at 9 entries, with the lowest-scoring entry evicted when a new one qualifies
+- [x] Reloading the page preserves previously saved scoreboard entries
