@@ -103,6 +103,11 @@ h1 {
   margin: 0;
 }
 
+.puzzle-header .timer {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 #new-puzzle-button {
   font-size: 0.95rem;
   padding: 0.4rem 0.9rem;
