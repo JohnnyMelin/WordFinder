@@ -21,9 +21,16 @@
 // puzzle.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
-import { computeScore } from './scoring.js';
+import { computeScore, rankEntries } from './scoring.js';
+import { loadScores, saveScores } from './scoreboard-storage.js';
 import { initStartScreen } from './start-screen.js';
 import { THEME_NAMES, loadRandomWords, poolFor, wordCountMaxFor } from './word-pools.js';
+
+// Arcade-style name entry (ticket 12) is capped to this many characters,
+// and falls back to this placeholder when the player cancels the prompt
+// or leaves it blank.
+const MAX_NAME_LENGTH = 12;
+const ANONYMOUS_NAME = 'Anonymous';
 
 /**
  * Renders the letter grid and returns a 2D array of the cell elements,
@@ -401,6 +408,34 @@ function showScore(gridSize, wordCount) {
 
   const scoreLabel = document.getElementById('score-label');
   if (scoreLabel) scoreLabel.textContent = `Score: ${score}`;
+
+  return score;
+}
+
+/**
+ * Ticket 12's write path: checks the just-computed score against that
+ * grid size's independent top-9 scoreboard (scoring.js's rankEntries),
+ * and if it qualifies, prompts the player arcade-style for a short name
+ * before persisting. A non-qualifying score is left exactly as ticket 11
+ * left it — displayed via showScore, nothing prompted, nothing written.
+ *
+ * The name is filled in on `newEntry` *after* rankEntries has already
+ * decided whether/where it ranks — `entries` (from rankEntries) contains
+ * that same `newEntry` object by reference when qualified, so mutating
+ * its `name` here updates it in place within the list about to be
+ * saved, without needing to re-run the ranking logic.
+ */
+function recordScoreIfQualifying(gridSize, wordCount, score) {
+  const newEntry = { score, wordCount, date: new Date().toISOString() };
+  const { entries, qualified } = rankEntries(loadScores(gridSize), newEntry);
+
+  if (!qualified) return;
+
+  const rawName = window.prompt('New high score! Enter your name:');
+  const trimmedName = (rawName || '').trim().slice(0, MAX_NAME_LENGTH);
+  newEntry.name = trimmedName || ANONYMOUS_NAME;
+
+  saveScores(gridSize, entries);
 }
 
 function startPuzzle({ gridSize, theme, wordCount }) {
@@ -430,7 +465,8 @@ function startPuzzle({ gridSize, theme, wordCount }) {
     winBanner,
     onWin: () => {
       stopTimer();
-      showScore(gridSize, placements.length);
+      const score = showScore(gridSize, placements.length);
+      recordScoreIfQualifying(gridSize, placements.length, score);
     },
     signal: selectionAbortController.signal,
   });
