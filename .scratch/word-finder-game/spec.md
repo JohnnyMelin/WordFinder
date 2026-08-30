@@ -1,78 +1,100 @@
-Status: wontfix
+# Selection display modes & scoring system
 
-# Word Finder Game
+**Status:** ready-for-agent
 
 ## Problem Statement
 
-The user wants a classic word-search puzzle game they can play in a browser: pick a grid size, a theme, and how many words to hunt for, then find those words hidden in a letter grid by dragging across them. Nothing like this exists in the repo yet — it's a fresh build.
+When a puzzle has many overlapping words, the existing found-word display — highlighting every cell of the word — makes the grid hard to read. Once several found words cross paths, their highlighted cells blur together, making it hard for the player to visually isolate the letters that still belong to unfound words. There is also currently no way to measure or compare performance: no timer, no score, and no record of past results, so a finished puzzle has no sense of accomplishment beyond the win banner.
 
 ## Solution
 
-A static, buildless web app (plain HTML/CSS/JS) with two screens:
+Add a second, lower-noise way to mark a found word: instead of highlighting every cell, draw a line connecting only the word's first and last letter. The player can switch between this new "Line" mode and the existing "Highlight" mode via a toggle on the start screen, with their choice remembered between visits.
 
-1. **Start screen** — configure grid size/difficulty, theme, and word count.
-2. **Puzzle screen** — a generated letter grid plus a word list; the player selects words by click-drag (mouse) or touch-drag, matched words highlight and get marked off, and the game announces a win once every word is found.
+Alongside this, add a scoring system that rewards solving a puzzle quickly, scaled by how large the board is and how many words had to be found, plus a persistent, arcade-style top-9 scoreboard per board size that the player can check before or after playing.
 
 ## User Stories
 
-1. As a player, I want to choose a grid size (6x6 Easy, 10x10 Medium, 20x20 Hard), so that I can pick a difficulty that matches how much time/challenge I want.
-2. As a player, I want to choose a theme (Vehicles, Animals, Food, Countries, Sports, Colors, or Random/Any), so that the puzzle's words match something I'm interested in.
-3. As a player, I want to choose how many words are hidden in the grid, so that I can control puzzle length.
-4. As a player, I want the word-count selector to respect a per-grid-size maximum (6x6→6, 10x10→10, 20x20→45 for curated themes), so that the puzzle stays legible and words fit without crowding. (These were empirically re-tuned down from an original 6/30/50 during ticket 07's reliability work — see `.scratch/word-finder-game/issues/07-robust-puzzle-generation.md` and `GRID_SIZE_WORD_COUNT_MAX` in `js/game-logic.js` — because the original numbers caused `generatePuzzle` to fail placing words reliably at 10x10 and 20x20.) Random/Any uses a further-lowered 20x20 max of 35 instead of 45 (`RANDOM_POOL_WORD_COUNT_MAX` in `js/game-logic.js`; 6x6 and 10x10 are unaffected) — its fully-random word samples lack the letter correlation curated theme lists have, which made the shared 45-word max unreliable specifically for that theme. See the Known Limitation note under Further Notes for how this was found and resolved.
-5. As a player picking a theme with too few qualifying words, I want the word-count selector to silently cap itself to what's available, so that I never hit an error just from an unlucky theme/size combo.
-6. As a player, I want every hidden word to be between 3 and 14 letters regardless of grid size, so that even in a 20x20 grid no single word spans edge-to-edge (which wouldn't be fun to spot).
-7. As a player who picks a curated theme, I want the words drawn from a hand-authored, curated list for that theme, so that the words are actually thematic and recognizable (not random dictionary noise).
-8. As a player who picks Random/Any, I want words pulled from a broad general word list (word-list npm package), filtered to 3-14 letters, so that I get variety without needing a themed list.
-9. As a player, I want words placed horizontally, vertically, or diagonally, in either forward or reversed reading order (8 directions total), so that the puzzle has the classic word-search feel.
-10. As a player, I want overlapping words to share coinciding letters where possible, so that the grid feels dense and hand-crafted rather than sparse.
-11. As a player, I want every cell not used by a placed word filled with a random filler letter, so that the whole grid is full of letters, not blank space.
-12. As a player, I want to select a word by pressing and dragging across its letters (mouse) or touching and dragging (touch device), so that I can play on desktop or mobile.
-13. As a player, I want a correct selection to visually highlight in the grid and mark that word off the word list, so that I get immediate feedback and can track progress.
-14. As a player, I want to be told when I've found all the words, so that I know the puzzle is complete.
-15. As a player, I do not expect a timer, hint system, score, or save/resume progress in this version, so that the MVP stays focused and simple.
-16. As a player, I do not expect to type in my own custom word list in this version, so that theme selection is the only way to pick puzzle content for now.
+**Selection display**
+
+1. As a player solving a puzzle with many overlapping words, I want found words marked with a thin line instead of a full highlight, so that I can still visually distinguish the letters that belong to words I haven't found yet.
+2. As a player, I want the found-word line to run only between the first and last letter of the word, so that it doesn't obscure the letters in between.
+3. As a player, I want found-word lines to be a semi-transparent light gray, so that I can still read the letters underneath the line.
+4. As a player who has found many overlapping words, I want multiple crossing found-word lines to look the same as a single line where they overlap, so that dense overlaps don't turn into a dark, illegible tangle.
+5. As a player, I want the found-word line to be plain, with no dot or marker at its endpoints, so that the display stays minimal.
+6. As a player, I want letter tiles to look exactly like unfound tiles once a word is found (in Line mode), so that the line is the only thing indicating a word was found.
+7. As a player currently dragging out a selection, I want to see a live line grow from my starting letter to my current position, so that I get the same kind of feedback as the old tile-by-tile preview but consistent with the new found-word style.
+8. As a player, I want the in-progress drag line to appear in a bold, fully-saturated color, so that I can immediately tell it apart from the lighter, transparent lines of already-found words.
+9. As a player who prefers the original look, I want a "Highlight" mode that restores full-tile highlighting for both the in-progress drag and found words, so that I can keep playing the way I'm used to.
+10. As a player, I want to switch between "Line" and "Highlight" display modes from the start screen, so that I don't have to hunt through a separate settings area to change it.
+11. As a returning player, I want my chosen display mode to be remembered the next time I open the game, so that I don't have to reselect it every session.
+12. As a new player, I want the game to default to "Line" mode, so that I see the improved display without having to discover the setting myself.
+
+**Timer**
+
+13. As a player, I want to see a running timer once the puzzle grid appears, so that I know how much time I've spent so far.
+14. As a player, I want the timer to start only once the grid has actually rendered, so that puzzle-generation time (which I can't act on, particularly on large boards) doesn't count against me.
+15. As a player, I want the timer to stop the moment I find the last word, so that my final time reflects only the time I spent actively solving.
+
+**Scoring**
+
+16. As a player, I want my score to be higher the faster I finish a puzzle, so that speed is rewarded.
+17. As a player, I want a larger board or a longer word list to raise the amount of score available, so that harder puzzles feel worth more than easy ones even if they take longer to finish.
+18. As a player, I want to see my score as soon as I finish the puzzle, so that I get immediate feedback on how I did.
+
+**Scoreboard**
+
+19. As a player, I want a separate top-9 scoreboard for each board size (6x6, 10x10, 20x20), so that I'm only compared against other results from a puzzle of the same difficulty tier.
+20. As a player who just finished a puzzle with a top-9 score, I want to be prompted arcade-style to enter a short name, so that my result is recognizable on the scoreboard.
+21. As a player, I want to see my score even if it doesn't make the top 9, so that finishing a puzzle always gives me some feedback, not just when I set a record.
+22. As a player whose score doesn't make the top 9, I want to see that I didn't place without seeing a specific rank number, so that I get an honest result without a discouraging "you were #47" callout.
+23. As a player, I want each scoreboard entry to show the name, score, word count used, and date it was achieved, so that I have context for how a given score was earned.
+24. As a player, I want to browse all three scoreboards from the start screen before I've even played, so that I can see what I'm aiming to beat.
+25. As a player who just finished a puzzle, I want to browse the scoreboards from the win screen, so that I can immediately see how my result compares.
+26. As a player switching between scoreboards, I want to move between the 6x6, 10x10, and 20x20 boards using tabs inside one modal, so that comparing across difficulties doesn't require navigating away from what I'm doing.
+27. As a player, I want my scoreboard results saved across sessions on this device, so that they aren't lost when I close the browser.
 
 ## Implementation Decisions
 
-- **Test seam**: a single dependency-free JS module (e.g. `game-logic.js`) with no DOM access, exposing puzzle generation and selection-checking as pure functions. All rendering, Pointer Events wiring, and screen transitions live in a separate UI layer that calls into this module. This is the only seam the codebase needs — the UI layer is verified by playing the game in a browser, not by unit tests.
-  - `generatePuzzle({ theme, gridSize, wordCount })` → `{ grid, placements }`, where `grid` is a 2D array of letters and `placements` records each placed word's cells/direction.
-  - `checkSelection(placements, selectedCells)` → the matched word (or `null`), tolerant of a selection made in either direction along the word's line.
-- **Selection input**: Pointer Events (not separate mouse/touch handlers), so click-drag and touch-drag share one code path.
-- **Curated word data**: one hand-authored list per curated theme (Vehicles, Animals, Food, Countries, Sports, Colors), ~100 words each, 3-14 letters, stored as static data (e.g. `data/<theme>.json` or a JS module) shipped with the app.
-- **Random/Any word data**: generated ahead of time, not at runtime. A one-off Node script (dev-only, not part of the deployed app, not run on every load) reads the `word-list` npm package (~15,600 words, MIT licensed), filters to 3-14 letters, and writes a static `data/random-words.json` checked into the repo. The deployed site fetches this static JSON like any other theme file — no npm package, no build step, no server-side code at runtime or deploy time.
-- **Word count capping**: when a theme (curated or random) has fewer qualifying words (3-14 letters) than the grid size's max, the start screen's word-count selector's max is dynamically set to the smaller of the two — never allow a count the theme can't fulfill.
-- **Placement algorithm**: attempt each word in a random one of 8 directions at a random position; allow placement over existing letters only where they match (supporting overlaps); on failed attempts, retry with a new direction/position up to a reasonable attempt limit, then fall back to placing without requiring overlap. Remaining empty cells get random filler letters (A-Z) after all words are placed.
-- **No framework, no bundler**: plain HTML/CSS/JS files, ES modules loaded directly via `<script type="module">`, deployable as static files with no build tooling.
+- New pure, dependency-free module (`scoring.js`, alongside `game-logic.js` in `js/`) exposes:
+  - A `computeScore` function taking grid size, word count, and elapsed time, returning a numeric score using `score = gridSize² × wordCount × K / elapsedSeconds`, where `K` is an internal tuning constant chosen during implementation. Elapsed time is floored to a small minimum before dividing, so a freak near-instant finish can't produce an absurd or infinite score.
+  - Pure top-9 ranking/insertion logic that, given an existing list of scoreboard entries and a new entry, returns the updated list (sorted descending by score, truncated to 9 entries) and whether the new entry qualified. This function has no knowledge of `localStorage` or the DOM — it's a plain array transformation.
+- Selection/found-word rendering gets two code paths in `ui.js`, switched on the display-mode setting:
+  - **Highlight mode**: unchanged — the existing `.selecting`/`.found` CSS-class approach on individual grid cells stays exactly as it is today.
+  - **Line mode**: a new rendering path draws lines instead. The in-progress drag renders a live line from the start cell's center to the current cell's center in the app's existing accent color, at full saturation, replacing the `.selecting` class entirely while this mode is active. A confirmed found word renders as a static line between the first and last cell of its placement (`placements[i].cells[0]` and the last entry), in a transparent light gray, with no endpoint markers. Overlapping found-word lines must not visually compound into a darker tangle — this is achieved with a blend mode (e.g. a lines layer using a "lighten"-style blend) so that identical semi-transparent strokes crossing each other render the same as a single stroke.
+- The display-mode toggle lives inline on the start screen (alongside the existing grid-size and word-count controls), labeled with a "Highlight" option for the classic mode. The chosen mode is persisted in `localStorage` and defaults to Line mode when no stored preference exists.
+- Timer: elapsed time is measured starting the moment the grid is rendered and shown on the puzzle screen (i.e., right after `renderGrid` runs in `startPuzzle`), displayed live, and stops the moment the win condition is reached (the same point `markWordFound` currently detects all words found). The frozen elapsed time and the current grid size/word count feed into `computeScore` to produce the game's score, shown on the win screen.
+- Scoreboard persistence uses `localStorage`, keyed per grid size (three independent lists, one per board size), each holding up to 9 entries `{ name, score, wordCount, date }`. Reads and writes go through a small set of named helper functions rather than scattered inline calls, so a future swap to a backend-backed store only requires changing those functions' internals.
+- On a win, the game checks (via the pure ranking logic in `scoring.js`) whether the score qualifies for its grid size's top 9. If it does, the player is prompted for a short name (arcade high-score style) before the entry is written to `localStorage`. If it doesn't qualify, the player still sees their score on the win screen, with no rank shown, and nothing is written to storage.
+- A "View Scoreboards" modal is reachable both from the start screen and the win screen, with tabs for the three grid sizes; each tab lists that board size's top-9 entries (rank, name, score, word count, date). No in-game "record to beat" indicator is shown during play.
 
 ## Testing Decisions
 
-- Good tests here exercise `game-logic.js`'s external behavior only — given inputs, assert on the returned grid/placements/match result — never assert on internal implementation details like which random position/direction a word landed at.
-- Modules tested: `generatePuzzle` and `checkSelection` (or equivalent pure functions) in `game-logic.js`.
-- Coverage to include: requested word count actually gets placed (respecting theme/size caps), every placed word is findable by reading its claimed direction out of the grid, no two placed words' overlapping cells conflict (same letter at the shared cell), all non-word cells are filled, and `checkSelection` correctly matches a drag made in either direction along a placed word's line and correctly rejects a non-matching drag.
-- No prior art in this repo (fresh project) — the test runner/framework choice is left to the implementing agent, picking whatever is simplest to run against a plain-JS ES module with no DOM dependency (e.g. Node's built-in test runner) so the "no build step" deploy story isn't compromised by test-only tooling.
-- UI layer (rendering, Pointer Events, screen flow) is verified manually by playing the game in a browser, not by automated tests.
+A good test here exercises externally observable behavior (inputs/outputs of a pure function), not internal implementation details — consistent with how this codebase already tests `game-logic.js` and `file-protocol-warning.js`.
+
+- `scoring.test.js` (new, `node:test` + `node:assert`, no DOM) covers:
+  - `computeScore`: score increases as elapsed time decreases (fixed grid size/word count); score increases as grid size or word count increases (fixed elapsed time); the elapsed-time floor prevents runaway or infinite scores on a near-zero elapsed time.
+  - The ranking/insertion logic: a new entry that beats an existing 9th-place entry qualifies and displaces it; a new entry that doesn't beat the current 9th place doesn't qualify and leaves the stored list unchanged; the returned list stays sorted descending and capped at 9 entries; inserting into a list with fewer than 9 entries always qualifies.
+  - Prior art: `js/game-logic.test.js` and `js/file-protocol-warning.test.js` — both test small, pure, DOM-free modules this way, run via `npm test` (`node --test`).
+- Everything else introduced by this spec — the line/blend-mode rendering, the live drag-preview line, the Highlight/Line toggle, the timer display, the name-entry prompt, the scoreboard modal, and the actual `localStorage` reads/writes — is DOM- and browser-environment-dependent UI code. Per the existing documented convention in `ui.js` ("this module is verified by loading the page in a browser, not by unit tests"), this layer is verified manually: loading the page, playing through puzzles at each board size, toggling display modes, forcing many overlapping words to check the line/blend-mode behavior, and checking scoreboard behavior at the top, middle, and 9th/10th-place boundary.
 
 ## Out of Scope
 
-- Timer, hints, scoring, save/resume progress (all deferred to v2 per plan.md).
-- Custom typed-in word list (deferred to v2 per plan.md).
-- Additional themes beyond the six curated ones + Random/Any.
-- Any server-side component, build pipeline, or bundler for the deployed app.
-- Automated/visual regression testing of the UI/rendering layer.
+- A backend or server-side scoreboard — only local, per-device `localStorage` persistence ships now, structured so a backend can be swapped in later.
+- Cross-device or cross-browser score syncing.
+- A "clear scores" / reset control for the scoreboard.
+- A live "record to beat" indicator shown during gameplay.
+- Segmenting the scoreboard by word count (only grid size) — a single board size's leaderboard mixes different word counts, with the score formula accounting for the difference.
+- Endpoint markers/dots on found-word or drag-preview lines.
+- Per-word line coloring (all found-word lines share one uniform style).
+- Hints, mistakes/wrong-guess penalties, or other mechanics already excluded from MVP per `plan.md`.
+- Score tie-breaking rules beyond natural descending sort order.
+- Name input validation/moderation beyond a basic length limit.
 
 ## Further Notes
 
-- Source spec: `plan.md` at the repo root (unchanged by this spec; this file is the actionable synthesis of it).
-- This is a fresh repo with no existing code, so there are no existing seams to prefer over the one proposed above.
-
-### Known limitation, resolved: Random/Any latency at 20x20's word-count max
-
-`generatePuzzle`'s packing algorithm (tuned in ticket 07 against curated themes) turned out to have a real reliability gap for Random/Any specifically: curated theme words tend to share letters with each other, giving the overlap-seeking algorithm easy candidates, while a fully random sample from the Random/Any pool (`data/random-words.json`) often doesn't. This was first found as "occasional multi-second latency" (measured 4.4s and 26s worst cases at 20x20/45 words) and initially deferred as a documented known limitation — but further testing (triggered by the code-review fix pass's own new test) showed it can fail outright, not just run slowly: 4/40 sampled runs at 20x20/45 threw after exhausting all placement attempts, with the successful runs in that batch averaging ~15.5s.
-
-Resolved by giving Random/Any its own, separate (lower) word-count maximum at 20x20 — `RANDOM_POOL_WORD_COUNT_MAX` in `js/game-logic.js`, currently `{ 20: 35 }` — rather than sharing curated themes' 45. Empirically confirmed reliable and fast at 35 (0 failures across 150 runs, 51ms worst case, ~9ms average; see the "Random/Any reliability" stress tests in `js/game-logic.test.js`). 6x6 and 10x10's shared maxes (6 and 10) were already fully reliable for a random sample too, so they were left unchanged. `word-pools.js`'s `wordCountMaxFor(gridSize, theme)` is what the start screen actually calls, and picks the right ceiling table per theme.
-
-## Comments
-
-> *This was generated by AI during triage.*
-
-Already implemented in full across tickets 01-07 (each closed individually as already-implemented — see their own issue files) plus a code-review fix pass. Now merged to `master` via fast-forward `9a96876`. The code review just run against this spec found zero missing or partial requirements. Closing as already-implemented, not a rejection.
+- This spec was produced through an interactive `/grill-me` session; the key rationale behind less-obvious decisions:
+  - Line mode's uniform color (rather than per-word coloring) was a deliberate simplification — the goal is decluttering so unfound words stay legible, not making individual found words individually distinguishable from each other.
+  - The blend-mode approach for non-additive overlaps was chosen as an implementation detail to satisfy an explicit requirement ("a letter's visibility must stay the same no matter how many lines cross it"), not something requiring further design input.
+  - Per-board-size (rather than unified) scoreboards were chosen because comparing a 6x6 result against a 20x20 result isn't meaningful even with a normalizing formula.
+  - The exact value of `K` in the scoring formula is an internal tuning constant with no functional impact on the design and can be adjusted freely during implementation/playtesting.
+- Relevant existing files: `js/ui.js` (grid/word-list rendering, selection handling, win detection), `js/game-logic.js` (puzzle engine, placements), `js/start-screen.js` (start-screen controls), `css/styles.css` (existing `.selecting`/`.found` styles to be joined by the new Line-mode styles).
