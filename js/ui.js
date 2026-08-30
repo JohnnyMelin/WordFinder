@@ -518,17 +518,17 @@ function clearScoreLabel() {
 }
 
 /**
- * Computes this puzzle's score (ticket 11) from its grid size and word
- * count, plus the just-frozen elapsed time (getFinalElapsedSeconds(),
- * populated by stopTimer() which must run before this is called), and
- * displays it on the win screen. Pure calculation lives in scoring.js;
- * this is just the DOM-facing call site — no persistence or scoreboard
- * happens here (ticket 12).
+ * Computes this puzzle's score (ticket 11) from its dimensions
+ * (`{ gridSize, wordCount }` — the same shape computeScore itself takes,
+ * just missing elapsedSeconds) plus the just-frozen elapsed time
+ * (getFinalElapsedSeconds(), populated by stopTimer() which must run
+ * before this is called), and displays it on the win screen. Pure
+ * calculation lives in scoring.js; this is just the DOM-facing call
+ * site — no persistence or scoreboard happens here (ticket 12).
  */
-function showScore(gridSize, wordCount) {
+function showScore(dimensions) {
   const score = computeScore({
-    gridSize,
-    wordCount,
+    ...dimensions,
     elapsedSeconds: getFinalElapsedSeconds(),
   });
 
@@ -545,13 +545,17 @@ function showScore(gridSize, wordCount) {
  * before persisting. A non-qualifying score is left exactly as ticket 11
  * left it — displayed via showScore, nothing prompted, nothing written.
  *
+ * `dimensions` is the same `{ gridSize, wordCount }` object passed to
+ * showScore, so the puzzle's identifying shape travels as one value
+ * instead of two parallel positional args.
+ *
  * The name is filled in on `newEntry` *after* rankEntries has already
  * decided whether/where it ranks — `entries` (from rankEntries) contains
  * that same `newEntry` object by reference when qualified, so mutating
  * its `name` here updates it in place within the list about to be
  * saved, without needing to re-run the ranking logic.
  */
-function recordScoreIfQualifying(gridSize, wordCount, score) {
+function recordScoreIfQualifying({ gridSize, wordCount }, score) {
   const newEntry = { score, wordCount, date: new Date().toISOString() };
   const { entries, qualified } = rankEntries(loadScores(gridSize), newEntry);
 
@@ -569,6 +573,14 @@ function recordScoreIfQualifying(gridSize, wordCount, score) {
 // button can open the modal defaulted to the size just played instead of
 // always falling back to the smallest board.
 let currentPuzzleGridSize = SCOREBOARD_GRID_SIZES[0];
+
+// The scoreboard modal's three DOM elements, resolved once in init() and
+// reused by openScoreboardModal/closeScoreboardModal/selectScoreboardTab
+// below instead of each of them re-querying the DOM on every open, close,
+// or tab switch.
+let scoreboardModalEl = null;
+let scoreboardTabsEl = null;
+let scoreboardListEl = null;
 
 /**
  * Renders the modal's row of per-grid-size tab buttons, marking whichever
@@ -653,8 +665,8 @@ function renderScoreboardEntries(container, gridSize) {
  * and the entries list. Used both when a tab is clicked and when the
  * modal is first opened. */
 function selectScoreboardTab(gridSize) {
-  renderScoreboardTabs(document.getElementById('scoreboard-tabs'), gridSize);
-  renderScoreboardEntries(document.getElementById('scoreboard-list'), gridSize);
+  renderScoreboardTabs(scoreboardTabsEl, gridSize);
+  renderScoreboardEntries(scoreboardListEl, gridSize);
 }
 
 /**
@@ -672,17 +684,15 @@ function selectScoreboardTab(gridSize) {
  * whichever screen was showing underneath is left exactly as it was.
  */
 function openScoreboardModal(preferredGridSize) {
-  const modal = document.getElementById('scoreboard-modal');
-  if (!modal) return;
+  if (!scoreboardModalEl) return;
 
   const gridSize = SCOREBOARD_GRID_SIZES.includes(preferredGridSize) ? preferredGridSize : SCOREBOARD_GRID_SIZES[0];
   selectScoreboardTab(gridSize);
-  modal.hidden = false;
+  scoreboardModalEl.hidden = false;
 }
 
 function closeScoreboardModal() {
-  const modal = document.getElementById('scoreboard-modal');
-  if (modal) modal.hidden = true;
+  if (scoreboardModalEl) scoreboardModalEl.hidden = true;
 }
 
 function startPuzzle({ gridSize, theme, wordCount }) {
@@ -701,6 +711,8 @@ function startPuzzle({ gridSize, theme, wordCount }) {
   const itemsByWord = renderWordList(placements, document.getElementById('word-list'));
   const winBanner = document.getElementById('win-banner');
   winBanner.hidden = true;
+  const winViewScoreboardsButton = document.getElementById('win-view-scoreboards-button');
+  if (winViewScoreboardsButton) winViewScoreboardsButton.hidden = true;
   clearScoreLabel();
 
   if (selectionAbortController) selectionAbortController.abort();
@@ -714,8 +726,10 @@ function startPuzzle({ gridSize, theme, wordCount }) {
     winBanner,
     onWin: () => {
       stopTimer();
-      const score = showScore(gridSize, placements.length);
-      recordScoreIfQualifying(gridSize, placements.length, score);
+      if (winViewScoreboardsButton) winViewScoreboardsButton.hidden = false;
+      const dimensions = { gridSize, wordCount: placements.length };
+      const score = showScore(dimensions);
+      recordScoreIfQualifying(dimensions, score);
     },
     signal: selectionAbortController.signal,
   });
@@ -731,6 +745,12 @@ async function init() {
   // populates its own internal pool, which poolFor/wordCountMaxFor then
   // read.
   await loadRandomWords();
+
+  // Resolved once here and reused by openScoreboardModal/closeScoreboardModal/
+  // selectScoreboardTab instead of each re-querying the DOM on every call.
+  scoreboardModalEl = document.getElementById('scoreboard-modal');
+  scoreboardTabsEl = document.getElementById('scoreboard-tabs');
+  scoreboardListEl = document.getElementById('scoreboard-list');
 
   initStartScreen({
     form: document.getElementById('start-form'),
@@ -763,13 +783,12 @@ async function init() {
     winViewScoreboardsButton.addEventListener('click', () => openScoreboardModal(currentPuzzleGridSize));
   }
 
-  const scoreboardModal = document.getElementById('scoreboard-modal');
-  if (scoreboardModal) {
+  if (scoreboardModalEl) {
     // Clicking the backdrop itself (not the modal card inside it) closes
     // the modal — event.target is only the overlay element when the click
     // didn't land on (or bubble up through) `.modal`.
-    scoreboardModal.addEventListener('click', (event) => {
-      if (event.target === scoreboardModal) closeScoreboardModal();
+    scoreboardModalEl.addEventListener('click', (event) => {
+      if (event.target === scoreboardModalEl) closeScoreboardModal();
     });
   }
 
@@ -779,7 +798,7 @@ async function init() {
   }
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && scoreboardModal && !scoreboardModal.hidden) {
+    if (event.key === 'Escape' && scoreboardModalEl && !scoreboardModalEl.hidden) {
       closeScoreboardModal();
     }
   });

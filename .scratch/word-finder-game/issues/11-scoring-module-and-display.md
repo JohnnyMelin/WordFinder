@@ -6,10 +6,10 @@
 
 **Status:** ready-for-agent
 
-- [ ] A new dependency-free module computes a score from grid size, word count, and elapsed time, with no DOM or storage dependency
-- [ ] The score increases as elapsed time decreases, for a fixed grid size and word count
-- [ ] The score increases as grid size or word count increases, for a fixed elapsed time
-- [ ] A safety floor on elapsed time prevents a near-zero elapsed time from producing a runaway or infinite score
-- [ ] The same module exposes pure top-9 ranking/insertion logic: given an existing list of entries and a new entry, it returns the updated list (sorted descending by score, capped at 9) and whether the new entry qualified — with no knowledge of `localStorage` or the DOM
-- [ ] Unit tests (in the style of `game-logic.test.js` / `file-protocol-warning.test.js`) cover the score formula's monotonic behavior, the elapsed-time floor, and the ranking logic's qualify/reject/sort/cap behavior at the 9-entry boundary
-- [ ] On winning a puzzle, the score is computed from the frozen timer value and displayed to the player on the win screen
+- [x] A new dependency-free module computes a score from grid size, word count, and elapsed time, with no DOM or storage dependency
+- [x] The score increases as elapsed time decreases, for a fixed grid size and word count
+- [x] The score increases as grid size or word count increases, for a fixed elapsed time
+- [x] A safety floor on elapsed time prevents a near-zero elapsed time from producing a runaway or infinite score
+- [x] The same module exposes pure top-9 ranking/insertion logic: given an existing list of entries and a new entry, it returns the updated list (sorted descending by score, capped at 9) and whether the new entry qualified — with no knowledge of `localStorage` or the DOM
+- [x] Unit tests (in the style of `game-logic.test.js` / `file-protocol-warning.test.js`) cover the score formula's monotonic behavior, the elapsed-time floor, and the ranking logic's qualify/reject/sort/cap behavior at the 9-entry boundary
+- [x] On winning a puzzle, the score is computed from the frozen timer value and displayed to the player on the win screen

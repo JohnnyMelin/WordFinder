@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] A "View Scoreboards" control on the start screen opens the modal without starting a puzzle
-- [ ] A "View Scoreboards" control on the win screen opens the same modal
-- [ ] The modal has three tabs, one per grid size, switchable without leaving the modal
-- [ ] Each tab lists its grid size's saved entries in rank order, showing rank, name, score, word count used, and date achieved
-- [ ] A grid size with no saved scores yet shows a sensible empty state rather than an error or blank area
-- [ ] The modal can be dismissed and returns the player to whichever screen (start or win) they opened it from
+- [x] A "View Scoreboards" control on the start screen opens the modal without starting a puzzle
+- [x] A "View Scoreboards" control on the win screen opens the same modal
+- [x] The modal has three tabs, one per grid size, switchable without leaving the modal
+- [x] Each tab lists its grid size's saved entries in rank order, showing rank, name, score, word count used, and date achieved
+- [x] A grid size with no saved scores yet shows a sensible empty state rather than an error or blank area
+- [x] The modal can be dismissed and returns the player to whichever screen (start or win) they opened it from

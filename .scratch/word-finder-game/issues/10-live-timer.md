@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] A visible, live-updating timer appears on the puzzle screen
-- [ ] The timer starts at the moment the grid is rendered/shown, not when the player clicks "Start Game" on the start screen — puzzle-generation time is never counted
-- [ ] The timer keeps counting up while the player plays
-- [ ] The timer stops the instant the last word is found (the same moment the win banner appears), and the final elapsed time is available for later use
-- [ ] Starting a new puzzle resets the timer back to zero
+- [x] A visible, live-updating timer appears on the puzzle screen
+- [x] The timer starts at the moment the grid is rendered/shown, not when the player clicks "Start Game" on the start screen — puzzle-generation time is never counted
+- [x] The timer keeps counting up while the player plays
+- [x] The timer stops the instant the last word is found (the same moment the win banner appears), and the final elapsed time is available for later use
+- [x] Starting a new puzzle resets the timer back to zero
