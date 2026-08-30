@@ -25,6 +25,15 @@
 // createLineRenderer below), chosen per the persisted display-mode
 // preference in display-mode.js. The start screen's toggle for that
 // preference lives in start-screen.js.
+//
+// Scoreboard modal (ticket 13): a "View Scoreboards" overlay reachable
+// from both screens (openScoreboardModal below), browsing the same
+// per-grid-size data recordScoreIfQualifying writes via
+// scoreboard-storage.js. It's `#scoreboard-modal` in index.html — a plain
+// overlay `<div>` toggled via `hidden`, deliberately a sibling of the
+// `.screen` sections rather than one itself, so showScreen() never
+// touches it and whichever screen was showing underneath is left exactly
+// as it was once the modal is dismissed.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
 import { computeScore, rankEntries } from './scoring.js';
@@ -38,6 +47,11 @@ import { getDisplayMode, DISPLAY_MODE_LINE } from './display-mode.js';
 // or leaves it blank.
 const MAX_NAME_LENGTH = 12;
 const ANONYMOUS_NAME = 'Anonymous';
+
+// The three valid grid sizes, in the fixed order their scoreboard tabs
+// are always shown (ticket 13) — matches scoreboard-storage.js's three
+// independent storage keys and start-screen.js's GRID_SIZE_CHOICES.
+const SCOREBOARD_GRID_SIZES = [6, 10, 20];
 
 /**
  * Renders the letter grid and returns a 2D array of the cell elements,
@@ -550,7 +564,130 @@ function recordScoreIfQualifying(gridSize, wordCount, score) {
   saveScores(gridSize, entries);
 }
 
+// The grid size of whichever puzzle is currently on the puzzle screen (set
+// at the top of startPuzzle below), so the win screen's "View Scoreboards"
+// button can open the modal defaulted to the size just played instead of
+// always falling back to the smallest board.
+let currentPuzzleGridSize = SCOREBOARD_GRID_SIZES[0];
+
+/**
+ * Renders the modal's row of per-grid-size tab buttons, marking whichever
+ * one matches `selectedGridSize` active. Re-rendered on every tab switch
+ * (rather than just toggling a class on existing buttons) to keep this in
+ * lockstep with renderScoreboardEntries below — both are driven from the
+ * same `selectScoreboardTab` call.
+ */
+function renderScoreboardTabs(container, selectedGridSize) {
+  container.replaceChildren();
+
+  for (const gridSize of SCOREBOARD_GRID_SIZES) {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'scoreboard-tab';
+    tab.textContent = `${gridSize}x${gridSize}`;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(gridSize === selectedGridSize));
+    tab.classList.toggle('active', gridSize === selectedGridSize);
+    tab.addEventListener('click', () => selectScoreboardTab(gridSize));
+    container.appendChild(tab);
+  }
+}
+
+/**
+ * Renders one grid size's saved entries (freshly loaded from
+ * scoreboard-storage.js every call, so a score recorded moments ago on the
+ * win screen always shows up) in the rank order they're already stored in
+ * — rankEntries keeps the stored list sorted descending by score, so rank
+ * is just the entry's index + 1. Falls back to a plain empty-state message
+ * when there's nothing saved yet for this grid size.
+ */
+function renderScoreboardEntries(container, gridSize) {
+  container.replaceChildren();
+
+  const entries = loadScores(gridSize);
+  if (entries.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'scoreboard-empty';
+    empty.textContent = 'No scores yet — be the first!';
+    container.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('ol');
+  list.className = 'scoreboard-entries';
+
+  entries.forEach((entry, index) => {
+    const item = document.createElement('li');
+    item.className = 'scoreboard-entry';
+
+    const main = document.createElement('div');
+    main.className = 'scoreboard-entry-main';
+
+    const rank = document.createElement('span');
+    rank.className = 'scoreboard-rank';
+    rank.textContent = `#${index + 1}`;
+
+    const name = document.createElement('span');
+    name.className = 'scoreboard-name';
+    name.textContent = entry.name || ANONYMOUS_NAME;
+
+    const score = document.createElement('span');
+    score.className = 'scoreboard-score';
+    score.textContent = `${entry.score} pts`;
+
+    main.append(rank, name, score);
+
+    const meta = document.createElement('div');
+    meta.className = 'scoreboard-entry-meta';
+    const formattedDate = entry.date ? new Date(entry.date).toLocaleDateString() : '';
+    meta.textContent = [`${entry.wordCount ?? '?'} words`, formattedDate].filter(Boolean).join(' • ');
+
+    item.append(main, meta);
+    list.appendChild(item);
+  });
+
+  container.appendChild(list);
+}
+
+/** Switches the modal to `gridSize`'s tab, re-rendering both the tab row
+ * and the entries list. Used both when a tab is clicked and when the
+ * modal is first opened. */
+function selectScoreboardTab(gridSize) {
+  renderScoreboardTabs(document.getElementById('scoreboard-tabs'), gridSize);
+  renderScoreboardEntries(document.getElementById('scoreboard-list'), gridSize);
+}
+
+/**
+ * Opens the "View Scoreboards" modal (ticket 13), reachable from both the
+ * start screen and the win screen. `preferredGridSize` lets the win
+ * screen default the modal to the size just played; the start screen
+ * calls this with no argument, defaulting to the smallest board.
+ * Re-renders the selected tab's entries fresh from loadScores() every
+ * time the modal opens, so it always reflects the latest saved data —
+ * important right after a score was just recorded on the win screen.
+ *
+ * The modal is a plain overlay `<div>` toggled via `hidden`, a sibling of
+ * the `.screen` sections rather than one itself, so opening/closing it
+ * never touches showScreen()'s single-screen-visible bookkeeping and
+ * whichever screen was showing underneath is left exactly as it was.
+ */
+function openScoreboardModal(preferredGridSize) {
+  const modal = document.getElementById('scoreboard-modal');
+  if (!modal) return;
+
+  const gridSize = SCOREBOARD_GRID_SIZES.includes(preferredGridSize) ? preferredGridSize : SCOREBOARD_GRID_SIZES[0];
+  selectScoreboardTab(gridSize);
+  modal.hidden = false;
+}
+
+function closeScoreboardModal() {
+  const modal = document.getElementById('scoreboard-modal');
+  if (modal) modal.hidden = true;
+}
+
 function startPuzzle({ gridSize, theme, wordCount }) {
+  currentPuzzleGridSize = gridSize;
+
   const pool = poolFor(theme);
   const words = pickWords(pool, gridSize, wordCount);
   const { grid, placements } = generatePuzzle(words, gridSize);
@@ -610,6 +747,42 @@ async function init() {
   if (newPuzzleButton) {
     newPuzzleButton.addEventListener('click', () => showScreen('start-screen'));
   }
+
+  // Scoreboard modal (ticket 13): reachable from both the start screen
+  // (before playing) and the win screen (right after finishing, defaulted
+  // to the size just played). Dismissible via its close button or by
+  // clicking the backdrop; either way it just re-hides the overlay, so
+  // whichever screen was showing underneath is untouched.
+  const viewScoreboardsButton = document.getElementById('view-scoreboards-button');
+  if (viewScoreboardsButton) {
+    viewScoreboardsButton.addEventListener('click', () => openScoreboardModal());
+  }
+
+  const winViewScoreboardsButton = document.getElementById('win-view-scoreboards-button');
+  if (winViewScoreboardsButton) {
+    winViewScoreboardsButton.addEventListener('click', () => openScoreboardModal(currentPuzzleGridSize));
+  }
+
+  const scoreboardModal = document.getElementById('scoreboard-modal');
+  if (scoreboardModal) {
+    // Clicking the backdrop itself (not the modal card inside it) closes
+    // the modal — event.target is only the overlay element when the click
+    // didn't land on (or bubble up through) `.modal`.
+    scoreboardModal.addEventListener('click', (event) => {
+      if (event.target === scoreboardModal) closeScoreboardModal();
+    });
+  }
+
+  const scoreboardModalClose = document.getElementById('scoreboard-modal-close');
+  if (scoreboardModalClose) {
+    scoreboardModalClose.addEventListener('click', closeScoreboardModal);
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && scoreboardModal && !scoreboardModal.hidden) {
+      closeScoreboardModal();
+    }
+  });
 
   showScreen('start-screen');
 }
