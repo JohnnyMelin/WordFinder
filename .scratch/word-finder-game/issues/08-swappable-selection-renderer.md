@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Dragging a selection still shows the existing full-tile highlight preview, cell by cell, exactly as today
-- [ ] Confirming a found word still highlights its cells and strikes through its entry in the word list, exactly as today
-- [ ] The win banner still appears once every word is found, exactly as today
-- [ ] The preview/found-word rendering logic used by the selection-handling code is encapsulated behind one renderer object/interface, rather than inline class-toggling scattered through the selection handlers
-- [ ] No new user-visible behavior is introduced by this ticket
+- [x] Dragging a selection still shows the existing full-tile highlight preview, cell by cell, exactly as today
+- [x] Confirming a found word still highlights its cells and strikes through its entry in the word list, exactly as today
+- [x] The win banner still appears once every word is found, exactly as today
+- [x] The preview/found-word rendering logic used by the selection-handling code is encapsulated behind one renderer object/interface, rather than inline class-toggling scattered through the selection handlers
+- [x] No new user-visible behavior is introduced by this ticket

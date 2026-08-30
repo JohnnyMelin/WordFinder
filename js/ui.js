@@ -97,6 +97,48 @@ function cellsAlongLine(start, end) {
 }
 
 /**
+ * Today's full-tile highlight display: the drag preview and found-word
+ * marking both just toggle a class on the affected cells. `cellElementAt`
+ * resolves a {row, col} to its DOM cell (or null if out of bounds).
+ *
+ * This is the renderer interface a later ticket's alternate display (e.g.
+ * a line-based one) implements instead: `setPreview(cells)` shows the
+ * live in-progress selection, `clearPreview()` removes it, and
+ * `markFound(cells)` marks a confirmed word's cells permanently. Callers
+ * never toggle CSS classes directly — they go through whichever renderer
+ * is in play.
+ */
+function createHighlightRenderer(cellElementAt) {
+  let previewCells = [];
+
+  function clearPreview() {
+    for (const cell of previewCells) {
+      const el = cellElementAt(cell.row, cell.col);
+      if (el) el.classList.remove('selecting');
+    }
+    previewCells = [];
+  }
+
+  function setPreview(cells) {
+    clearPreview();
+    for (const cell of cells) {
+      const el = cellElementAt(cell.row, cell.col);
+      if (el) el.classList.add('selecting');
+    }
+    previewCells = cells;
+  }
+
+  function markFound(cells) {
+    for (const cell of cells) {
+      const el = cellElementAt(cell.row, cell.col);
+      if (el) el.classList.add('found');
+    }
+  }
+
+  return { setPreview, clearPreview, markFound };
+}
+
+/**
  * Wires up selection: pointerdown/pointermove/pointerup on the grid
  * container drive one shared code path for both mouse drag and touch
  * drag (Pointer Events unify the two). On release, the selected run of
@@ -123,20 +165,15 @@ function setupSelection({ container, cellElements, placements, itemsByWord, winB
     return cellElements[row][col];
   }
 
+  const renderer = createHighlightRenderer(cellElementAt);
+
   function clearPreview() {
-    for (const cell of previewCells) {
-      const el = cellElementAt(cell.row, cell.col);
-      if (el) el.classList.remove('selecting');
-    }
+    renderer.clearPreview();
     previewCells = [];
   }
 
   function setPreview(cells) {
-    clearPreview();
-    for (const cell of cells) {
-      const el = cellElementAt(cell.row, cell.col);
-      if (el) el.classList.add('selecting');
-    }
+    renderer.setPreview(cells);
     previewCells = cells;
   }
 
@@ -155,10 +192,7 @@ function setupSelection({ container, cellElements, placements, itemsByWord, winB
   function markWordFound(word, cells) {
     foundWords.add(word);
 
-    for (const cell of cells) {
-      const el = cellElementAt(cell.row, cell.col);
-      if (el) el.classList.add('found');
-    }
+    renderer.markFound(cells);
 
     const item = itemsByWord.get(word);
     if (item) item.classList.add('found');
