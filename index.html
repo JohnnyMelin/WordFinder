@@ -10,6 +10,8 @@
     <main>
       <h1>Word Finder</h1>
 
+      <div id="file-protocol-warning" class="file-protocol-warning" role="alert" hidden></div>
+
       <section id="start-screen" class="screen">
         <form id="start-form">
           <fieldset class="field grid-size-field">
@@ -52,6 +54,27 @@
       </section>
     </main>
 
+    <script src="js/file-protocol-warning.js"></script>
+    <script>
+      // Plain classic script, deliberately not `type="module"`: browsers
+      // block ES module loading over file://, which is exactly the
+      // condition this needs to survive in order to report. The decision
+      // itself (and its message text) lives in js/file-protocol-warning.js,
+      // loaded just above as a classic script too so it can run here; this
+      // is just a thin caller applying its result to the DOM — untested,
+      // per this repo's existing UI-layer convention (see ui.js's header
+      // comment).
+      var message = window.fileProtocolWarning(window.location.protocol);
+      if (message) {
+        var warning = document.getElementById('file-protocol-warning');
+        if (warning) {
+          warning.textContent = message;
+          warning.hidden = false;
+        }
+        var startScreen = document.getElementById('start-screen');
+        if (startScreen) startScreen.hidden = true;
+      }
+    </script>
     <script type="module" src="js/ui.js"></script>
   </body>
 </html>
