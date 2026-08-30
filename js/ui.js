@@ -19,10 +19,17 @@
 // lives in word-pools.js (loadRandomWords/poolFor/wordCountMaxFor),
 // imported below; this module just calls into it to pick words for a
 // puzzle.
+//
+// Selection/found-word display (ticket 09): setupSelection renders
+// through a swappable renderer (createHighlightRenderer or
+// createLineRenderer below), chosen per the persisted display-mode
+// preference in display-mode.js. The start screen's toggle for that
+// preference lives in start-screen.js.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
 import { initStartScreen } from './start-screen.js';
 import { THEME_NAMES, loadRandomWords, poolFor, wordCountMaxFor } from './word-pools.js';
+import { getDisplayMode, DISPLAY_MODE_LINE } from './display-mode.js';
 
 /**
  * Renders the letter grid and returns a 2D array of the cell elements,
@@ -101,9 +108,9 @@ function cellsAlongLine(start, end) {
  * marking both just toggle a class on the affected cells. `cellElementAt`
  * resolves a {row, col} to its DOM cell (or null if out of bounds).
  *
- * This is the renderer interface a later ticket's alternate display (e.g.
- * a line-based one) implements instead: `setPreview(cells)` shows the
- * live in-progress selection, `clearPreview()` removes it, and
+ * This is the renderer interface an alternate display implements instead
+ * (see `createLineRenderer` below, ticket 09): `setPreview(cells)` shows
+ * the live in-progress selection, `clearPreview()` removes it, and
  * `markFound(cells)` marks a confirmed word's cells permanently. Callers
  * never toggle CSS classes directly — they go through whichever renderer
  * is in play.
@@ -138,6 +145,101 @@ function createHighlightRenderer(cellElementAt) {
   return { setPreview, clearPreview, markFound };
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * Line-mode display (ticket 09): implements the same renderer interface
+ * as `createHighlightRenderer` (`setPreview`/`clearPreview`/`markFound`),
+ * but instead of toggling classes on cells, draws lines onto an
+ * absolutely-positioned SVG overlay appended into `container` (the grid
+ * element; its CSS gives it `position: relative` so the overlay's
+ * `inset: 0` lines up with `cellElementAt`'s cells' own `offsetLeft`/
+ * `offsetTop` — both are measured from the same padding-edge origin,
+ * which is how cell centers are located below).
+ *
+ * `setPreview(cells)` points a single live line from `cells`'s first
+ * entry to its last (the drag-preview color/weight is styled in CSS via
+ * `.preview-line`, at full opacity/saturation). `markFound(cells)` adds a
+ * permanent line the same way, into the `.found-lines` group.
+ *
+ * Found-word lines need care to satisfy "crossing lines never look
+ * darker than a single line": each `.found-line` stroke is drawn fully
+ * *opaque* (not semi-transparent itself) — painting an opaque stroke over
+ * an already-opaque same-colored pixel changes nothing, so overlapping
+ * found-lines can never compound. The actual "semi-transparent light
+ * gray" look is applied exactly *once*, as a single CSS `opacity` on the
+ * whole `.found-lines` group, after its contents are flattened. Flattening
+ * first (rather than each line separately carrying alpha) is what
+ * `isolation: isolate` on `.found-lines` buys: it's the standard technique
+ * for "many overlapping same-color shapes should look the same as one" —
+ * per-stroke alpha alone doesn't achieve this, since alpha compositing
+ * always accumulates coverage across separately-painted semi-transparent
+ * layers regardless of blend mode; only a single opacity applied to the
+ * pre-flattened whole avoids that. `mix-blend-mode: lighten` on the
+ * strokes (scoped by that same isolation to blend only against each
+ * other, not the real grid backdrop) additionally smooths over the
+ * anti-aliased edge pixels where two lines' boundaries cross. Neither
+ * line style draws endpoint markers; a cell's tiles get no class changes
+ * at all in this mode.
+ */
+function createLineRenderer(cellElementAt, container) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.classList.add('selection-lines');
+  svg.setAttribute('aria-hidden', 'true');
+  container.appendChild(svg);
+
+  const foundLines = document.createElementNS(SVG_NS, 'g');
+  foundLines.classList.add('found-lines');
+  svg.appendChild(foundLines);
+
+  const previewLine = document.createElementNS(SVG_NS, 'line');
+  previewLine.classList.add('preview-line');
+  previewLine.style.display = 'none';
+  svg.appendChild(previewLine);
+
+  function cellCenter({ row, col }) {
+    const el = cellElementAt(row, col);
+    if (!el) return null;
+    return { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2 };
+  }
+
+  /** Points `line` from `cells`'s first entry to its last. Returns false
+   * (leaving `line` untouched) if either endpoint is out of bounds. */
+  function pointLine(line, cells) {
+    const start = cellCenter(cells[0]);
+    const end = cellCenter(cells[cells.length - 1]);
+    if (!start || !end) return false;
+
+    line.setAttribute('x1', String(start.x));
+    line.setAttribute('y1', String(start.y));
+    line.setAttribute('x2', String(end.x));
+    line.setAttribute('y2', String(end.y));
+    return true;
+  }
+
+  function clearPreview() {
+    previewLine.style.display = 'none';
+  }
+
+  function setPreview(cells) {
+    if (cells.length === 0 || !pointLine(previewLine, cells)) {
+      clearPreview();
+      return;
+    }
+    previewLine.style.display = '';
+  }
+
+  function markFound(cells) {
+    if (cells.length === 0) return;
+
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.classList.add('found-line');
+    if (pointLine(line, cells)) foundLines.appendChild(line);
+  }
+
+  return { setPreview, clearPreview, markFound };
+}
+
 /**
  * Wires up selection: pointerdown/pointermove/pointerup on the grid
  * container drive one shared code path for both mouse drag and touch
@@ -151,6 +253,13 @@ function createHighlightRenderer(cellElementAt) {
  * its children are replaced by `renderGrid`), so without this a second
  * call to `setupSelection` for a new puzzle would stack a second set of
  * listeners on top of the first, double-handling every pointer event.
+ *
+ * The renderer actually used for the preview/found-word display is
+ * picked fresh on every call, based on the persisted display-mode
+ * preference (ticket 09, display-mode.js) at the moment the puzzle
+ * starts: Line mode (the default when nothing is stored yet) gets
+ * `createLineRenderer`; Highlight mode gets `createHighlightRenderer`,
+ * today's unchanged behavior.
  */
 function setupSelection({ container, cellElements, placements, itemsByWord, winBanner, onWin, signal }) {
   const gridSize = cellElements.length;
@@ -165,7 +274,10 @@ function setupSelection({ container, cellElements, placements, itemsByWord, winB
     return cellElements[row][col];
   }
 
-  const renderer = createHighlightRenderer(cellElementAt);
+  const renderer =
+    getDisplayMode() === DISPLAY_MODE_LINE
+      ? createLineRenderer(cellElementAt, container)
+      : createHighlightRenderer(cellElementAt);
 
   function clearPreview() {
     renderer.clearPreview();
@@ -419,6 +531,7 @@ async function init() {
     form: document.getElementById('start-form'),
     gridSizeContainer: document.getElementById('grid-size-choices'),
     themeContainer: document.getElementById('theme-choices'),
+    displayModeContainer: document.getElementById('display-mode-choices'),
     themes: THEME_NAMES,
     wordCountInput: document.getElementById('word-count'),
     getWordCountMax: wordCountMaxFor,

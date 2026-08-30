@@ -1,18 +1,28 @@
 // start-screen.js
 //
-// Start-screen controller: lets the player pick a grid size, a theme, and
-// a word count before playing, then hands that configuration off to a
-// caller-supplied callback (ui.js generates and renders the puzzle from
-// it). Pure DOM wiring only — the actual word-count-max math (including
-// which per-theme ceiling table applies) lives entirely in the caller-
-// supplied `getWordCountMax(gridSize, theme)` callback; this module just
-// keeps the word-count input's `max` (and current value, if it now
-// overshoots) in sync with whatever that callback returns whenever the
-// grid size or theme changes. It doesn't know anything about theme
-// *data* itself (no import of data/themes.js, no import of game-logic.js)
-// — the caller supplies the list of theme names to render and the
-// `getWordCountMax` callback to size against, so this stays generic
-// across future pools/themes/ceilings without changes here.
+// Start-screen controller: lets the player pick a grid size, a theme, a
+// word count, and a selection-display mode before playing, then hands
+// that configuration off to a caller-supplied callback (ui.js generates
+// and renders the puzzle from it). Pure DOM wiring only — the actual
+// word-count-max math (including which per-theme ceiling table applies)
+// lives entirely in the caller-supplied `getWordCountMax(gridSize,
+// theme)` callback; this module just keeps the word-count input's `max`
+// (and current value, if it now overshoots) in sync with whatever that
+// callback returns whenever the grid size or theme changes. It doesn't
+// know anything about theme *data* itself (no import of data/themes.js,
+// no import of game-logic.js) — the caller supplies the list of theme
+// names to render and the `getWordCountMax` callback to size against, so
+// this stays generic across future pools/themes/ceilings without changes
+// here.
+//
+// The display-mode toggle (ticket 09) is the one exception to "no data
+// imports": display-mode.js is a tiny, self-contained localStorage
+// wrapper (not puzzle content like themes/pools), so this module reads
+// and writes through it directly rather than routing it through the
+// caller — there's no future-extensibility reason to keep it generic the
+// way the theme/pool wiring is.
+
+import { getDisplayMode, setDisplayMode, DISPLAY_MODE_LINE, DISPLAY_MODE_HIGHLIGHT } from './display-mode.js';
 
 // Grid size choices offered on the start screen. Kept as UI-facing data
 // (value + label) separate from GRID_SIZE_WORD_COUNT_MAX in
@@ -21,6 +31,13 @@ const GRID_SIZE_CHOICES = [
   { value: 6, label: '6x6 (Easy)' },
   { value: 10, label: '10x10 (Medium)' },
   { value: 20, label: '20x20 (Hard)' },
+];
+
+// Display-mode choices (ticket 09). Labeled so the classic full-tile mode
+// reads as "Highlight"; see display-mode.js for the persisted values.
+const DISPLAY_MODE_CHOICES = [
+  { value: DISPLAY_MODE_LINE, label: 'Line' },
+  { value: DISPLAY_MODE_HIGHLIGHT, label: 'Highlight' },
 ];
 
 const DEFAULT_GRID_SIZE = 10;
@@ -79,6 +96,11 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
  *   size radio buttons are rendered into.
  * @param {HTMLElement} options.themeContainer - container the theme
  *   radio buttons are rendered into.
+ * @param {HTMLElement} options.displayModeContainer - container the
+ *   Line/Highlight display-mode radio buttons are rendered into (ticket
+ *   09); its initial checked value comes from display-mode.js's
+ *   persisted preference (defaulting to Line), and a change is persisted
+ *   back through it immediately.
  * @param {string[]} options.themes - theme names to offer, in display
  *   order; the first is selected by default.
  * @param {HTMLInputElement} options.wordCountInput - the numeric word-
@@ -95,6 +117,7 @@ export function initStartScreen({
   form,
   gridSizeContainer,
   themeContainer,
+  displayModeContainer,
   themes,
   wordCountInput,
   getWordCountMax,
@@ -120,6 +143,16 @@ export function initStartScreen({
     toLabel: (theme) => theme,
     isChecked: (theme) => theme === defaultTheme,
     onChange: syncWordCountMax,
+  });
+
+  renderRadioGroup(displayModeContainer, {
+    name: 'display-mode',
+    className: 'choice display-mode-choice',
+    items: DISPLAY_MODE_CHOICES,
+    toValue: (choice) => choice.value,
+    toLabel: (choice) => choice.label,
+    isChecked: (choice) => choice.value === getDisplayMode(),
+    onChange: (event) => setDisplayMode(event.target.value),
   });
 
   function selectedGridSize() {
