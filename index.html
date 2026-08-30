@@ -36,6 +36,8 @@
 
           <button id="start-button" type="submit">Start</button>
         </form>
+
+        <button id="view-scoreboards-button" type="button" class="view-scoreboards-button">View Scoreboards</button>
       </section>
 
       <section id="puzzle-screen" class="screen" hidden>
@@ -48,6 +50,9 @@
         <div id="win-banner" class="win-banner" role="status" hidden>
           You found every word! Puzzle complete.
           <span id="score-label" class="score-label"></span>
+          <button id="win-view-scoreboards-button" type="button" class="view-scoreboards-button">
+            View Scoreboards
+          </button>
         </div>
 
         <div class="puzzle-layout">
@@ -59,6 +64,24 @@
           </aside>
         </div>
       </section>
+
+      <!-- Scoreboard modal (ticket 13): a plain overlay, not a `.screen` —
+           showScreen() only ever touches `.screen` sections, so this stays
+           untouched (and thus able to layer on top) no matter which screen
+           is showing underneath. Toggled purely via the `hidden` attribute
+           in js/ui.js; its tab buttons and results area are populated (and
+           re-populated fresh from loadScores()) there too. -->
+      <div id="scoreboard-modal" class="modal-overlay" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="scoreboard-modal-title">
+          <div class="modal-header">
+            <h2 id="scoreboard-modal-title">Scoreboards</h2>
+            <button id="scoreboard-modal-close" type="button" class="modal-close" aria-label="Close">&times;</button>
+          </div>
+
+          <div id="scoreboard-tabs" class="scoreboard-tabs" role="tablist"></div>
+          <div id="scoreboard-list" class="scoreboard-list"></div>
+        </div>
+      </div>
     </main>
 
     <script src="js/file-protocol-warning.js"></script>
