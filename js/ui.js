@@ -152,7 +152,7 @@ function createHighlightRenderer(cellElementAt) {
  * call to `setupSelection` for a new puzzle would stack a second set of
  * listeners on top of the first, double-handling every pointer event.
  */
-function setupSelection({ container, cellElements, placements, itemsByWord, winBanner, signal }) {
+function setupSelection({ container, cellElements, placements, itemsByWord, winBanner, onWin, signal }) {
   const gridSize = cellElements.length;
   const foundWords = new Set();
 
@@ -199,6 +199,7 @@ function setupSelection({ container, cellElements, placements, itemsByWord, winB
 
     if (winBanner && foundWords.size === placements.length) {
       winBanner.hidden = false;
+      if (onWin) onWin();
     }
   }
 
@@ -308,6 +309,72 @@ function showScreen(id) {
 // setupSelection's doc comment on why this is necessary).
 let selectionAbortController = null;
 
+// Timer state, kept in this same module scope for the same reason
+// selectionAbortController is: startPuzzle can be called again for a new
+// puzzle, and without explicitly clearing the previous interval it would
+// keep ticking alongside a second one. `timerStartedAt` is the timestamp
+// (from performance.now()) the currently-showing puzzle's timer started
+// counting from; `finalElapsedSeconds` is the frozen reading (whole
+// seconds) from the moment the puzzle was won, left in place until the
+// next call to startTimer() — later tickets (e.g. ticket 11's scoring)
+// read it via getFinalElapsedSeconds().
+let timerIntervalId = null;
+let timerStartedAt = null;
+let finalElapsedSeconds = null;
+
+function formatElapsed(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function currentElapsedSeconds() {
+  if (timerStartedAt === null) return 0;
+  return Math.floor((performance.now() - timerStartedAt) / 1000);
+}
+
+function renderTimer(seconds) {
+  const timerLabel = document.getElementById('timer-label');
+  if (timerLabel) timerLabel.textContent = formatElapsed(seconds);
+}
+
+/** Starts (or restarts) the live timer at zero. Clears any interval left
+ * running from a previous puzzle first — the same stacking hazard
+ * selectionAbortController solves for pointer listeners, but for
+ * setInterval instead of event listeners. Called right after renderGrid
+ * inside startPuzzle, so puzzle-generation time is never counted. */
+function startTimer() {
+  if (timerIntervalId !== null) clearInterval(timerIntervalId);
+
+  timerStartedAt = performance.now();
+  finalElapsedSeconds = null;
+  renderTimer(0);
+  timerIntervalId = setInterval(() => renderTimer(currentElapsedSeconds()), 250);
+}
+
+/** Stops the live timer the instant the puzzle is won and freezes the
+ * final elapsed time (whole seconds) in finalElapsedSeconds, read by
+ * getFinalElapsedSeconds() below. Passed to setupSelection as `onWin`. */
+function stopTimer() {
+  if (timerIntervalId !== null) {
+    clearInterval(timerIntervalId);
+    timerIntervalId = null;
+  }
+  finalElapsedSeconds = currentElapsedSeconds();
+  renderTimer(finalElapsedSeconds);
+}
+
+/**
+ * The frozen elapsed time (whole seconds) from the most recently won
+ * puzzle on screen, or null if the current puzzle hasn't been won yet.
+ * This is the seam later tickets (e.g. ticket 11's scoring) read from —
+ * import { getFinalElapsedSeconds } from './ui.js' and call it once the
+ * win banner is showing.
+ */
+export function getFinalElapsedSeconds() {
+  return finalElapsedSeconds;
+}
+
 function startPuzzle({ gridSize, theme, wordCount }) {
   const pool = poolFor(theme);
   const words = pickWords(pool, gridSize, wordCount);
@@ -318,6 +385,7 @@ function startPuzzle({ gridSize, theme, wordCount }) {
 
   const gridContainer = document.getElementById('grid');
   const cellElements = renderGrid(grid, gridContainer);
+  startTimer();
   const itemsByWord = renderWordList(placements, document.getElementById('word-list'));
   const winBanner = document.getElementById('win-banner');
   winBanner.hidden = true;
@@ -331,6 +399,7 @@ function startPuzzle({ gridSize, theme, wordCount }) {
     placements,
     itemsByWord,
     winBanner,
+    onWin: stopTimer,
     signal: selectionAbortController.signal,
   });
 
