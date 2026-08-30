@@ -21,6 +21,7 @@
 // puzzle.
 
 import { generatePuzzle, checkSelection } from './game-logic.js';
+import { computeScore } from './scoring.js';
 import { initStartScreen } from './start-screen.js';
 import { THEME_NAMES, loadRandomWords, poolFor, wordCountMaxFor } from './word-pools.js';
 
@@ -375,6 +376,33 @@ export function getFinalElapsedSeconds() {
   return finalElapsedSeconds;
 }
 
+/** Clears the win screen's score display, called at the start of every
+ * puzzle (alongside hiding winBanner) so a previous puzzle's score never
+ * flashes before this one has been won. */
+function clearScoreLabel() {
+  const scoreLabel = document.getElementById('score-label');
+  if (scoreLabel) scoreLabel.textContent = '';
+}
+
+/**
+ * Computes this puzzle's score (ticket 11) from its grid size and word
+ * count, plus the just-frozen elapsed time (getFinalElapsedSeconds(),
+ * populated by stopTimer() which must run before this is called), and
+ * displays it on the win screen. Pure calculation lives in scoring.js;
+ * this is just the DOM-facing call site — no persistence or scoreboard
+ * happens here (ticket 12).
+ */
+function showScore(gridSize, wordCount) {
+  const score = computeScore({
+    gridSize,
+    wordCount,
+    elapsedSeconds: getFinalElapsedSeconds(),
+  });
+
+  const scoreLabel = document.getElementById('score-label');
+  if (scoreLabel) scoreLabel.textContent = `Score: ${score}`;
+}
+
 function startPuzzle({ gridSize, theme, wordCount }) {
   const pool = poolFor(theme);
   const words = pickWords(pool, gridSize, wordCount);
@@ -389,6 +417,7 @@ function startPuzzle({ gridSize, theme, wordCount }) {
   const itemsByWord = renderWordList(placements, document.getElementById('word-list'));
   const winBanner = document.getElementById('win-banner');
   winBanner.hidden = true;
+  clearScoreLabel();
 
   if (selectionAbortController) selectionAbortController.abort();
   selectionAbortController = new AbortController();
@@ -399,7 +428,10 @@ function startPuzzle({ gridSize, theme, wordCount }) {
     placements,
     itemsByWord,
     winBanner,
-    onWin: stopTimer,
+    onWin: () => {
+      stopTimer();
+      showScore(gridSize, placements.length);
+    },
     signal: selectionAbortController.signal,
   });
 
