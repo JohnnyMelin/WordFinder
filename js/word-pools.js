@@ -18,7 +18,7 @@
 // rolls is pure logic delegated to random-theme.js's resolveRandomTheme.
 // This module owns the *state* — which curated theme it last resolved to
 // — and *when* to re-roll it, via handleThemeSelection below, called by
-// start-screen.js's onThemeChange hook both on an actual theme-radio
+// start-screen.js's onThemeChange hook both on an actual theme-select
 // change and on every start-screen re-entry (ticket 18's reroll timing:
 // re-rolls on selection and on re-entering the start screen while still
 // selected, but NOT on a grid-size change).
@@ -85,7 +85,7 @@ export async function loadRandomWords() {
  * (RANDOM_WORDS_NAME and every curated theme included). Intended to be
  * passed straight through as start-screen.js's `onThemeChange` hook —
  * that module calls it with whichever theme is currently selected both
- * when the theme radio changes and whenever the start screen is
+ * when the theme select changes and whenever the start screen is
  * (re-)entered, without itself knowing which theme name is special.
  */
 export function handleThemeSelection(theme) {

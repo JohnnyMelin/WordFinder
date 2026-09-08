@@ -809,7 +809,7 @@ async function init() {
   const startScreen = initStartScreen({
     form: document.getElementById('start-form'),
     gridSizeContainer: document.getElementById('grid-size-choices'),
-    themeContainer: document.getElementById('theme-choices'),
+    themeSelect: document.getElementById('theme-select'),
     displayModeContainer: document.getElementById('display-mode-choices'),
     themes: THEME_NAMES,
     defaultTheme: CURATED_THEME_NAMES[0],

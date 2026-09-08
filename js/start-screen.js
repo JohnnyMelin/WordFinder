@@ -16,7 +16,7 @@
 // across future pools/themes/ceilings without changes here. The optional
 // `onThemeChange` hook (ticket 18) is the same kind of generic pass-
 // through: this module calls it with whichever theme is currently
-// selected, both on an actual theme-radio change and via the returned
+// selected, both on an actual theme-select change and via the returned
 // `refresh()` (e.g. on start-screen re-entry), without knowing or caring
 // what the caller does with it (e.g. re-rolling a "Random Theme" option).
 //
@@ -51,9 +51,10 @@ const DEFAULT_WORD_COUNT = 10;
 /**
  * Renders one radio-button group (a label wrapping a radio input, per
  * item) into `container`, replacing whatever was there before. The
- * grid-size group and the theme group share this exact DOM shape and
- * only differ in the field name, the source items, and how a value/label
- * is pulled from each item — those differences are the callbacks below.
+ * grid-size group and the display-mode group share this exact DOM shape
+ * and only differ in the field name, the source items, and how a
+ * value/label is pulled from each item — those differences are the
+ * callbacks below.
  *
  * @param {HTMLElement} container - element the radio labels are appended to.
  * @param {Object} options
@@ -90,7 +91,39 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
 }
 
 /**
- * Renders the grid-size and theme radio choices and wires up the
+ * Renders one `<option>` per item into `select` (a combo box), replacing
+ * whatever was there before, and wires its `change` event. Used for the
+ * theme field, which — with dozens of curated themes plus the Random
+ * Words/Random Theme entries — got unwieldy as a radio group.
+ *
+ * @param {HTMLSelectElement} select - the combo box to populate.
+ * @param {Object} options
+ * @param {any[]} options.items - the choices to render, in order.
+ * @param {(item: any) => string|number} options.toValue - the option's
+ *   `value` for an item.
+ * @param {(item: any) => string} options.toLabel - the visible option
+ *   text for an item.
+ * @param {string|number} options.selectedValue - the value selected
+ *   initially.
+ * @param {(event: Event) => void} options.onChange - listener attached to
+ *   the select's `change` event.
+ */
+function renderSelect(select, { items, toValue, toLabel, selectedValue, onChange }) {
+  select.replaceChildren();
+
+  for (const item of items) {
+    const option = document.createElement('option');
+    option.value = String(toValue(item));
+    option.textContent = toLabel(item);
+    select.appendChild(option);
+  }
+
+  select.value = String(selectedValue);
+  select.addEventListener('change', onChange);
+}
+
+/**
+ * Renders the grid-size radio choices, the theme combo box, and wires up the
  * word-count input and the start form so that submitting it calls
  * `onStart` with the player's chosen `{ gridSize, theme, wordCount }`.
  *
@@ -99,8 +132,8 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
  *   submitting it (Start button or Enter) triggers `onStart`.
  * @param {HTMLElement} options.gridSizeContainer - container the grid-
  *   size radio buttons are rendered into.
- * @param {HTMLElement} options.themeContainer - container the theme
- *   radio buttons are rendered into.
+ * @param {HTMLSelectElement} options.themeSelect - the combo box theme
+ *   options are rendered into.
  * @param {HTMLElement} options.displayModeContainer - container the
  *   Line/Highlight display-mode radio buttons are rendered into (ticket
  *   09); its initial checked value comes from display-mode.js's
@@ -121,7 +154,7 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
  *   or theme change so this stays generic across future pools/themes/
  *   ceilings without changes here.
  * @param {(theme: string) => void} [options.onThemeChange] - called with
- *   the currently selected theme both when the theme radio changes and
+ *   the currently selected theme both when the theme select changes and
  *   whenever the returned `refresh()` is called (e.g. on start-screen
  *   re-entry). This module doesn't know or care what it does with that
  *   theme name (e.g. ticket 18's Random Theme re-roll) — it just forwards
@@ -137,7 +170,7 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
 export function initStartScreen({
   form,
   gridSizeContainer,
-  themeContainer,
+  themeSelect,
   displayModeContainer,
   themes,
   defaultTheme,
@@ -158,13 +191,11 @@ export function initStartScreen({
 
   const resolvedDefaultTheme = defaultTheme ?? themes[0];
 
-  renderRadioGroup(themeContainer, {
-    name: 'theme',
-    className: 'choice theme-choice',
+  renderSelect(themeSelect, {
     items: themes,
     toValue: (theme) => theme,
     toLabel: (theme) => theme,
-    isChecked: (theme) => theme === resolvedDefaultTheme,
+    selectedValue: resolvedDefaultTheme,
     onChange: handleThemeChange,
   });
 
@@ -184,8 +215,7 @@ export function initStartScreen({
   }
 
   function selectedTheme() {
-    const checked = themeContainer.querySelector('input[name="theme"]:checked');
-    return checked ? checked.value : resolvedDefaultTheme;
+    return themeSelect.value || resolvedDefaultTheme;
   }
 
   function handleThemeChange(event) {

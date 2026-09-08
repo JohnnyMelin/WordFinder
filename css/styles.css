@@ -51,11 +51,10 @@ h1 {
   max-width: 20rem;
 }
 
-/* Shared by the grid-size and theme fieldsets/radio groups on the start
-   screen (formerly two byte-identical rule pairs each: .grid-size-field/
-   .theme-field, .grid-size-choices/.theme-choices,
-   .grid-size-choice/.theme-choice). index.html and start-screen.js keep
-   the specific class names alongside these as hooks; only the shared
+/* Shared by the grid-size and display-mode fieldsets/radio groups on the
+   start screen (formerly also shared with the theme field, before the
+   theme radio group became a combo box). index.html and start-screen.js
+   keep the specific class names alongside these as hooks; only the shared
    declarations live here now. */
 .field {
   border: 1px solid #ccc;
@@ -77,10 +76,16 @@ h1 {
   cursor: pointer;
 }
 
-.word-count-field {
+.word-count-field,
+.theme-field {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+
+.theme-select {
+  font-size: 1rem;
+  padding: 0.4rem 0.5rem;
 }
 
 .word-count-field input {
