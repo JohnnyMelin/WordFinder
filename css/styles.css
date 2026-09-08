@@ -283,16 +283,14 @@ h1 {
 }
 
 /* "Show Theme" button (ticket 19): only rendered for Random Theme
-   puzzles (js/ui.js toggles its `hidden` attribute). Shares
-   .view-scoreboards-button's block/spacing/cursor look for visual
-   consistency with the other puzzle-screen reveal buttons. */
+   puzzles (js/ui.js toggles its `hidden` attribute). Carries the shared
+   .view-scoreboards-button class (index.html) for the same
+   block/spacing/cursor look as the other puzzle-screen reveal buttons;
+   this rule only overrides its margin so it sits snugly between the
+   "Find these words" heading and the word list. */
 .show-theme-button {
-  display: block;
   margin-top: 0;
   margin-bottom: 0.75rem;
-  font-size: 0.95rem;
-  padding: 0.4rem 0.9rem;
-  cursor: pointer;
 }
 
 /* Same `display: block` vs. `[hidden]` specificity fight
