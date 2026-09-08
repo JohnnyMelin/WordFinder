@@ -707,6 +707,42 @@ function closeScoreboardModal() {
   if (scoreboardModalEl) scoreboardModalEl.hidden = true;
 }
 
+/**
+ * Sets up the puzzle header's theme label and the "Show Theme" button
+ * (ticket 19) for `theme`. Curated themes and Random Words show their
+ * name immediately, exactly as before, with no button. Random Theme
+ * (ticket 18) instead leaves the label empty and reveals a "Show Theme"
+ * button above the word list; clicking it fills in the label with the
+ * resolved theme's name (resolvedThemeName(), word-pools.js) and hides
+ * the button. Winning the puzzle never touches either element, so the
+ * theme stays hidden through a win exactly as it was before — the
+ * button remains clickable post-win.
+ *
+ * Reassigning `.onclick` (rather than addEventListener) means a second
+ * puzzle's call here simply replaces the previous handler instead of
+ * stacking a new one on top — the same repeat-call hazard
+ * setupSelection's AbortController solves for pointer listeners, solved
+ * here the simpler way since there's only ever one button and one
+ * handler at a time.
+ */
+function applyThemeReveal(theme) {
+  const themeLabel = document.getElementById('theme-label');
+  const showThemeButton = document.getElementById('show-theme-button');
+  const isRandomTheme = theme === RANDOM_THEME_NAME;
+
+  if (themeLabel) themeLabel.textContent = isRandomTheme ? '' : theme;
+
+  if (showThemeButton) {
+    showThemeButton.hidden = !isRandomTheme;
+    showThemeButton.onclick = isRandomTheme
+      ? () => {
+          if (themeLabel) themeLabel.textContent = resolvedThemeName();
+          showThemeButton.hidden = true;
+        }
+      : null;
+  }
+}
+
 function startPuzzle({ gridSize, theme, wordCount }) {
   currentPuzzleGridSize = gridSize;
 
@@ -714,13 +750,7 @@ function startPuzzle({ gridSize, theme, wordCount }) {
   const words = pickWords(pool, gridSize, wordCount);
   const { grid, placements } = generatePuzzle(words, gridSize);
 
-  // Random Theme (ticket 18) shows the curated theme it resolved to, not
-  // the literal "Random Theme" label — same header treatment a curated
-  // theme gets, unconditionally for now (ticket 19 hides this behind a
-  // "Show Theme" button instead).
-  const displayedTheme = theme === RANDOM_THEME_NAME ? resolvedThemeName() : theme;
-  const themeLabel = document.getElementById('theme-label');
-  if (themeLabel) themeLabel.textContent = displayedTheme;
+  applyThemeReveal(theme);
 
   const gridContainer = document.getElementById('grid');
   const cellElements = renderGrid(grid, gridContainer);

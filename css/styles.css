@@ -282,6 +282,27 @@ h1 {
   font-size: 1.1rem;
 }
 
+/* "Show Theme" button (ticket 19): only rendered for Random Theme
+   puzzles (js/ui.js toggles its `hidden` attribute). Shares
+   .view-scoreboards-button's block/spacing/cursor look for visual
+   consistency with the other puzzle-screen reveal buttons. */
+.show-theme-button {
+  display: block;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+/* Same `display: block` vs. `[hidden]` specificity fight
+   #win-view-scoreboards-button[hidden] solves above — without this,
+   toggling the `hidden` attribute in js/ui.js would not actually hide
+   the button. */
+#show-theme-button[hidden] {
+  display: none;
+}
+
 .word-list {
   list-style: none;
   margin: 0;
