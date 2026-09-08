@@ -1,7 +1,8 @@
 // generate-random-words.js
 //
-// One-off, dev-only generation script for the "Random/Any" theme's word
-// pool (ticket 06). NOT part of the deployed app, NOT imported by
+// One-off, dev-only generation script for the "Random Words" theme's word
+// pool (ticket 06; relabeled from "Random/Any" in ticket 18). NOT part
+// of the deployed app, NOT imported by
 // ui.js/index.html, and NOT run at deploy time or app runtime — a
 // developer runs this manually (`node scripts/generate-random-words.js`)
 // whenever the word pool needs regenerating, and its output
@@ -32,7 +33,7 @@
 // package. Rather than shipping a multi-megabyte static JSON fetched at
 // runtime, this script randomly samples the filtered list down to
 // TARGET_COUNT (matching the spec's original ~15,600 estimate) so the
-// Random/Any theme's asset stays a comparable order of magnitude to the
+// Random Words theme's asset stays a comparable order of magnitude to the
 // package's originally-intended size, and to a lesser extent the curated
 // themes (~100 words each) it's meant to sit alongside.
 

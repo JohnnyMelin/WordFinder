@@ -11,9 +11,14 @@
 // callback returns whenever the grid size or theme changes. It doesn't
 // know anything about theme *data* itself (no import of data/themes.js,
 // no import of game-logic.js) — the caller supplies the list of theme
-// names to render and the `getWordCountMax` callback to size against, so
-// this stays generic across future pools/themes/ceilings without changes
-// here.
+// names to render, an explicit `defaultTheme` to check initially, and the
+// `getWordCountMax` callback to size against, so this stays generic
+// across future pools/themes/ceilings without changes here. The optional
+// `onThemeChange` hook (ticket 18) is the same kind of generic pass-
+// through: this module calls it with whichever theme is currently
+// selected, both on an actual theme-radio change and via the returned
+// `refresh()` (e.g. on start-screen re-entry), without knowing or caring
+// what the caller does with it (e.g. re-rolling a "Random Theme" option).
 //
 // The display-mode toggle (ticket 09) is the one exception to "no data
 // imports": display-mode.js is a tiny, self-contained localStorage
@@ -102,7 +107,12 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
  *   persisted preference (defaulting to Line), and a change is persisted
  *   back through it immediately.
  * @param {string[]} options.themes - theme names to offer, in display
- *   order; the first is selected by default.
+ *   order.
+ * @param {string} [options.defaultTheme] - the theme checked by default;
+ *   defaults to `themes[0]` if omitted. Kept separate from `themes`'
+ *   order since a caller's display order and its default selection don't
+ *   always agree (e.g. ticket 18: Random Words/Random Theme lead the
+ *   list, but a curated theme stays the default).
  * @param {HTMLInputElement} options.wordCountInput - the numeric word-
  *   count input; its `min`/`max`/`value` are managed here.
  * @param {(gridSize: number, theme: string) => number} options.getWordCountMax
@@ -110,8 +120,19 @@ function renderRadioGroup(container, { name, className, items, toValue, toLabel,
  *   pair (pool size already folded in), called fresh on every grid-size
  *   or theme change so this stays generic across future pools/themes/
  *   ceilings without changes here.
+ * @param {(theme: string) => void} [options.onThemeChange] - called with
+ *   the currently selected theme both when the theme radio changes and
+ *   whenever the returned `refresh()` is called (e.g. on start-screen
+ *   re-entry). This module doesn't know or care what it does with that
+ *   theme name (e.g. ticket 18's Random Theme re-roll) — it just forwards
+ *   whichever theme is current, staying generic across future themes.
  * @param {(config: { gridSize: number, theme: string, wordCount: number }) => void} options.onStart
  *   called when the player starts a puzzle.
+ * @returns {{ refresh: () => void }} `refresh` re-runs `onThemeChange`
+ *   (with the currently selected theme) and re-syncs the word-count max —
+ *   call it whenever the start screen is shown again without a full
+ *   re-init (e.g. "New Puzzle"), so a re-rollable theme like Random Theme
+ *   gets its chance to re-roll on every re-entry, not just the first.
  */
 export function initStartScreen({
   form,
@@ -119,8 +140,10 @@ export function initStartScreen({
   themeContainer,
   displayModeContainer,
   themes,
+  defaultTheme,
   wordCountInput,
   getWordCountMax,
+  onThemeChange,
   onStart,
 }) {
   renderRadioGroup(gridSizeContainer, {
@@ -133,7 +156,7 @@ export function initStartScreen({
     onChange: syncWordCountMax,
   });
 
-  const defaultTheme = themes[0];
+  const resolvedDefaultTheme = defaultTheme ?? themes[0];
 
   renderRadioGroup(themeContainer, {
     name: 'theme',
@@ -141,8 +164,8 @@ export function initStartScreen({
     items: themes,
     toValue: (theme) => theme,
     toLabel: (theme) => theme,
-    isChecked: (theme) => theme === defaultTheme,
-    onChange: syncWordCountMax,
+    isChecked: (theme) => theme === resolvedDefaultTheme,
+    onChange: handleThemeChange,
   });
 
   renderRadioGroup(displayModeContainer, {
@@ -162,7 +185,12 @@ export function initStartScreen({
 
   function selectedTheme() {
     const checked = themeContainer.querySelector('input[name="theme"]:checked');
-    return checked ? checked.value : defaultTheme;
+    return checked ? checked.value : resolvedDefaultTheme;
+  }
+
+  function handleThemeChange(event) {
+    if (onThemeChange) onThemeChange(event.target.value);
+    syncWordCountMax();
   }
 
   /**
@@ -197,4 +225,11 @@ export function initStartScreen({
       wordCount: Number(wordCountInput.value),
     });
   });
+
+  return {
+    refresh() {
+      if (onThemeChange) onThemeChange(selectedTheme());
+      syncWordCountMax();
+    },
+  };
 }

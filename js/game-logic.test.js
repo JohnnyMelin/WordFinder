@@ -11,7 +11,7 @@ import {
 } from './game-logic.js';
 import { THEMES } from './data/themes.js';
 
-// The pre-generated Random/Any word pool (see data/random-words.json's
+// The pre-generated Random Words word pool (see data/random-words.json's
 // generating script, scripts/generate-random-words.js). Loaded straight
 // off disk with fs/URL rather than imported as JSON, since this is a
 // plain-JS test file with no JSON-module loader configured.
@@ -388,14 +388,14 @@ for (const gridSize of Object.keys(GRID_SIZE_WORD_COUNT_MAX).map(Number)) {
   }
 }
 
-// --- Random/Any reliability -------------------------------------------
+// --- Random Words reliability -------------------------------------------
 //
-// STRESS_THEMES above deliberately excludes Random/Any: a fully random
+// STRESS_THEMES above deliberately excludes Random Words: a fully random
 // word sample lacks the letter correlation curated theme lists have
 // (their ~100 words tend to share letters/roots with each other far more
 // than an arbitrary sample does), which makes the overlap-seeking
 // placement algorithm's job measurably harder. Confirmed empirically:
-// at 20x20's *curated* max of 45 words, a Random/Any sample failed
+// at 20x20's *curated* max of 45 words, a Random Words sample failed
 // outright in 4/40 runs, with successful runs averaging ~15.5s (worst
 // case over 78s) — a real crash/freeze risk, not just occasional
 // slowness. 6x6's and 10x10's shared maxes (6 and 10) were already fully
@@ -407,25 +407,25 @@ for (const gridSize of Object.keys(GRID_SIZE_WORD_COUNT_MAX).map(Number)) {
 // reliable and fast (0 failures across 150 runs, 51ms worst case, ~9ms
 // average) — and getWordCountMax(gridSize, poolSize, RANDOM_POOL_WORD_COUNT_MAX)
 // is what the real app (word-pools.js's wordCountMaxFor) actually calls
-// for the Random/Any theme. These tests exercise that same real ceiling,
+// for the Random Words theme. These tests exercise that same real ceiling,
 // the same way the curated-theme loop above exercises
 // GRID_SIZE_WORD_COUNT_MAX — so this is a genuine reliability stress
 // test, not a reduced-scope smoke test; the previously-documented
 // "Known limitation" in spec.md described the *unfixed* 45-word case
 // and no longer describes what the shipped app actually does at 20x20.
-const RANDOM_ANY_STRESS_ITERATIONS_BY_GRID_SIZE = {
+const RANDOM_WORDS_STRESS_ITERATIONS_BY_GRID_SIZE = {
   6: 300,
   10: 300,
   20: 100,
 };
 
 for (const gridSize of Object.keys(GRID_SIZE_WORD_COUNT_MAX).map(Number)) {
-  const iterations = RANDOM_ANY_STRESS_ITERATIONS_BY_GRID_SIZE[gridSize];
+  const iterations = RANDOM_WORDS_STRESS_ITERATIONS_BY_GRID_SIZE[gridSize];
 
-  test(`generatePuzzle succeeds reliably at ${gridSize}x${gridSize}'s word-count max with a Random/Any sample (${iterations} runs)`, () => {
+  test(`generatePuzzle succeeds reliably at ${gridSize}x${gridSize}'s word-count max with a Random Words sample (${iterations} runs)`, () => {
     const poolSize = RANDOM_WORDS.filter((word) => word.length <= gridSize).length;
     const wordCount = getWordCountMax(gridSize, poolSize, RANDOM_POOL_WORD_COUNT_MAX);
-    assert.ok(wordCount > 0, 'expected the Random/Any pool to have at least one word <= ' + gridSize + ' letters');
+    assert.ok(wordCount > 0, 'expected the Random Words pool to have at least one word <= ' + gridSize + ' letters');
 
     let failures = 0;
     let firstError = null;
@@ -448,7 +448,7 @@ for (const gridSize of Object.keys(GRID_SIZE_WORD_COUNT_MAX).map(Number)) {
     assert.equal(
       failures,
       0,
-      `expected 0 failures placing ${wordCount} Random/Any words into a ${gridSize}x${gridSize} grid across ${iterations} runs, got ${failures}` +
+      `expected 0 failures placing ${wordCount} Random Words words into a ${gridSize}x${gridSize} grid across ${iterations} runs, got ${failures}` +
         (firstError ? ` (first error: ${firstError.message})` : '')
     );
   });

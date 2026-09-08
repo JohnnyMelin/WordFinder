@@ -13,12 +13,15 @@
 // puzzle swaps from one to the other; "New Puzzle" swaps back so the
 // player can reconfigure and start again without a page reload.
 //
-// Word source: the six curated theme lists in data/themes.js (ticket
-// 05), plus a seventh "Random/Any" theme (ticket 06) whose words come
-// from data/random-words.json. Fetching and resolving that pool data
-// lives in word-pools.js (loadRandomWords/poolFor/wordCountMaxFor),
-// imported below; this module just calls into it to pick words for a
-// puzzle.
+// Word source: the curated theme lists in data/themes.js (ticket 05),
+// plus "Random Words" (ticket 06, relabeled from "Random/Any" in ticket
+// 18) whose words come from data/random-words.json, plus "Random Theme"
+// (ticket 18) which resolves to one curated theme chosen uniformly at
+// random. Fetching and resolving that pool data — including Random
+// Theme's re-roll timing via handleThemeSelection, passed to
+// start-screen.js as its onThemeChange hook below — lives in
+// word-pools.js; this module just calls into it to pick words for a
+// puzzle and to label the puzzle header.
 //
 // Selection/found-word display (ticket 09): setupSelection renders
 // through a swappable renderer (createHighlightRenderer or
@@ -39,7 +42,16 @@ import { generatePuzzle, checkSelection } from './game-logic.js';
 import { computeScore, rankEntries } from './scoring.js';
 import { loadScores, saveScores } from './scoreboard-storage.js';
 import { initStartScreen } from './start-screen.js';
-import { THEME_NAMES, loadRandomWords, poolFor, wordCountMaxFor } from './word-pools.js';
+import {
+  THEME_NAMES,
+  CURATED_THEME_NAMES,
+  RANDOM_THEME_NAME,
+  loadRandomWords,
+  poolFor,
+  wordCountMaxFor,
+  handleThemeSelection,
+  resolvedThemeName,
+} from './word-pools.js';
 import { getDisplayMode, DISPLAY_MODE_LINE } from './display-mode.js';
 
 // Arcade-style name entry (ticket 12) is capped to this many characters,
@@ -702,8 +714,13 @@ function startPuzzle({ gridSize, theme, wordCount }) {
   const words = pickWords(pool, gridSize, wordCount);
   const { grid, placements } = generatePuzzle(words, gridSize);
 
+  // Random Theme (ticket 18) shows the curated theme it resolved to, not
+  // the literal "Random Theme" label — same header treatment a curated
+  // theme gets, unconditionally for now (ticket 19 hides this behind a
+  // "Show Theme" button instead).
+  const displayedTheme = theme === RANDOM_THEME_NAME ? resolvedThemeName() : theme;
   const themeLabel = document.getElementById('theme-label');
-  if (themeLabel) themeLabel.textContent = theme;
+  if (themeLabel) themeLabel.textContent = displayedTheme;
 
   const gridContainer = document.getElementById('grid');
   const cellElements = renderGrid(grid, gridContainer);
@@ -738,8 +755,8 @@ function startPuzzle({ gridSize, theme, wordCount }) {
 }
 
 async function init() {
-  // Awaited before initStartScreen so every theme (including Random/Any)
-  // is fully ready before the player can interact with the theme
+  // Awaited before initStartScreen so every theme (including Random
+  // Words) is fully ready before the player can interact with the theme
   // selector — no async creeps past this point into start-screen.js or
   // startPuzzle's synchronous pool lookups. loadRandomWords (word-pools.js)
   // populates its own internal pool, which poolFor/wordCountMaxFor then
@@ -752,20 +769,36 @@ async function init() {
   scoreboardTabsEl = document.getElementById('scoreboard-tabs');
   scoreboardListEl = document.getElementById('scoreboard-list');
 
-  initStartScreen({
+  // defaultTheme is pinned to a curated theme explicitly (ticket 18):
+  // THEME_NAMES now leads with Random Words/Random Theme, but the
+  // default checked option on page load must stay a curated theme
+  // regardless of that display order. onThemeChange is
+  // handleThemeSelection (word-pools.js) — it re-rolls Random Theme's
+  // resolved curated theme on selection and is called again via
+  // startScreen.refresh() below on every start-screen re-entry.
+  const startScreen = initStartScreen({
     form: document.getElementById('start-form'),
     gridSizeContainer: document.getElementById('grid-size-choices'),
     themeContainer: document.getElementById('theme-choices'),
     displayModeContainer: document.getElementById('display-mode-choices'),
     themes: THEME_NAMES,
+    defaultTheme: CURATED_THEME_NAMES[0],
     wordCountInput: document.getElementById('word-count'),
     getWordCountMax: wordCountMaxFor,
+    onThemeChange: handleThemeSelection,
     onStart: startPuzzle,
   });
 
   const newPuzzleButton = document.getElementById('new-puzzle-button');
   if (newPuzzleButton) {
-    newPuzzleButton.addEventListener('click', () => showScreen('start-screen'));
+    newPuzzleButton.addEventListener('click', () => {
+      // Re-entering the start screen: refresh() re-runs onThemeChange
+      // with whichever theme is currently checked, so a still-selected
+      // "Random Theme" re-rolls (ticket 18) before the player sees the
+      // word-count max or starts a new puzzle from it.
+      startScreen.refresh();
+      showScreen('start-screen');
+    });
   }
 
   // Scoreboard modal (ticket 13): reachable from both the start screen
