@@ -324,15 +324,20 @@ function pickWords(pool, gridSize, wordCount) {
   return shuffled.slice(0, wordCount);
 }
 
-// A representative sample of themes, not all six (per ticket 07's
+// A representative sample of themes, not all of them (per ticket 07's
 // scope) — chosen to stress the algorithm, not just confirm the easy
 // cases: Sports and Vehicles are data/themes.js's longest-word-skewed
 // lists (many 8-14 letter words, e.g. "PADDLEBOARDING", "STATIONWAGON"),
 // which is exactly the profile that made 30-into-10x10 fail 100% of the
 // time before this ticket's fix, so they're the themes most likely to
 // expose a regression. Animals is included as a more typical/shorter
-// mixed-length profile for contrast.
-const STRESS_THEMES = ['Sports', 'Vehicles', 'Animals'];
+// mixed-length profile for contrast. Dog Breeds (ticket 17's Arts & Play
+// batch) was added after an average-word-length audit across all
+// curated themes found it edges out Sports as the single longest-word-
+// skewed theme overall (avg ~8.5 letters/word vs. Sports' ~8.3, e.g.
+// "GERMANSHEPHERD", "ENGLISHBULLDOG" at the full 14-letter max), so it's
+// now the theme most likely to expose a future regression.
+const STRESS_THEMES = ['Sports', 'Vehicles', 'Animals', 'Dog Breeds'];
 
 // Iterations per (grid size, theme) case. Lower for 20x20 than for 6x6
 // and 10x10 — not because it's less important, but because each
